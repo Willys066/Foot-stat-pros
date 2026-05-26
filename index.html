@@ -989,8 +989,44 @@ tr:hover td{background:var(--s2)}
         <div class="chip" onclick="setSeuilFiab(4.5)">+4.5</div>
       </div>
     </div>
-    <button class="btn bb" onclick="calcFiabilite()">Analyser la fiabilité</button>
-    <button class="bsm" onclick="resetCalib()" style="width:100%;margin-top:7px;padding:9px;text-align:center;color:var(--y)">Réinitialiser la calibration</button>
+    <!-- SYNC GLOBALE -->
+    <div style="background:rgba(61,155,255,.06);border:1px solid rgba(61,155,255,.25);border-radius:9px;padding:12px;margin-bottom:10px">
+      <div style="font-weight:700;font-size:.8rem;color:var(--b);margin-bottom:4px">🔄 Synchronisation globale</div>
+      <div style="font-size:.64rem;color:var(--dm);font-family:var(--mono);margin-bottom:10px;line-height:1.5">Parcourt toutes les dates en base, recalcule les prédictions rétrospectivement et les compare aux résultats réels. Inclut les journées passées.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <div class="lsm">Date début</div>
+          <input class="inp" id="syncDu" type="date"/>
+        </div>
+        <div>
+          <div class="lsm">Date fin</div>
+          <input class="inp" id="syncAu" type="date"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:var(--dm);cursor:pointer">
+          <input type="checkbox" id="syncOverwrite" style="accent-color:var(--b)"/>
+          <span>Écraser entrées existantes</span>
+        </label>
+      </div>
+      <button class="btn bb" id="btnSync" onclick="syncGlobal()" style="font-size:.78rem;padding:10px;letter-spacing:1px">🔄 Lancer la synchronisation</button>
+      <button class="bsm" id="btnSyncStop" onclick="stopSync()" style="display:none;width:100%;margin-top:6px;padding:8px;text-align:center;color:var(--r);border-color:var(--r)">⏹ Arrêter</button>
+      <!-- Progress -->
+      <div id="syncLd" style="display:none;margin-top:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:.66rem;font-family:var(--mono)">
+          <span id="syncMsg" style="color:var(--b)">Initialisation...</span>
+          <span id="syncPct" style="color:var(--g);font-weight:700">0%</span>
+        </div>
+        <div class="lb"><div class="lf" id="syncFill" style="width:0%"></div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px">
+          <div style="text-align:center"><div style="font-size:1rem;font-weight:900;color:var(--g)" id="syncAdded">0</div><div style="font-size:.5rem;color:var(--dm);font-family:var(--mono)">Ajoutés</div></div>
+          <div style="text-align:center"><div style="font-size:1rem;font-weight:900;color:var(--y)" id="syncSkipped">0</div><div style="font-size:.5rem;color:var(--dm);font-family:var(--mono)">Ignorés</div></div>
+          <div style="text-align:center"><div style="font-size:1rem;font-weight:900;color:var(--dm)" id="syncTotal">0</div><div style="font-size:.5rem;color:var(--dm);font-family:var(--mono)">Traités</div></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn bb" onclick="calcFiabilite()" style="margin-bottom:7px">📊 Analyser la fiabilité</button>
+    <button class="bsm" onclick="resetCalib()" style="width:100%;padding:9px;text-align:center;color:var(--y)">Réinitialiser la calibration</button>
   </div>
   <div class="al" id="fiabAl"></div>
   <div id="fiabOut" style="display:none"></div>
@@ -2644,6 +2680,117 @@ function setFiabView(v){
   document.querySelectorAll('.fiab-tab').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)});
   renderFiabOut();
 }
+// ═══════════════════════════════════ SYNC GLOBALE ═══
+var _syncRunning=false;
+function stopSync(){_syncRunning=false;}
+function initSyncDates(){
+  var db=getDB(),dates=Object.keys(db).sort();
+  if(!dates.length)return;
+  var du=document.getElementById('syncDu'),au=document.getElementById('syncAu');
+  if(du&&!du.value)du.value=dates[0];
+  if(au&&!au.value)au.value=dates[dates.length-1];
+}
+function syncGlobal(){
+  if(_syncRunning)return;
+  var db=getDB();
+  var du=document.getElementById('syncDu').value;
+  var au=document.getElementById('syncAu').value;
+  var overwrite=document.getElementById('syncOverwrite').checked;
+  var dates=Object.keys(db).filter(function(d){return(!du||d>=du)&&(!au||d<=au)}).sort();
+  if(!dates.length){showAl('fiabAl','er','Aucune date en base — lance d\'abord une collecte');return}
+
+  // Collecter tous les matchs terminés avec score sur les dates filtrées
+  var candidates=[];
+  dates.forEach(function(d){
+    var ms=db[d]||[];
+    ms.forEach(function(m){
+      if(TERM.indexOf(m.status)>=0&&m.h!==null&&m.a!==null&&m.total!==null){
+        candidates.push(m);
+      }
+    });
+  });
+  if(!candidates.length){showAl('fiabAl','er','Aucun match terminé avec score dans la période');return}
+
+  // UI
+  _syncRunning=true;
+  document.getElementById('syncLd').style.display='block';
+  document.getElementById('btnSync').disabled=true;
+  document.getElementById('btnSyncStop').style.display='block';
+  document.getElementById('syncAdded').textContent='0';
+  document.getElementById('syncSkipped').textContent='0';
+  document.getElementById('syncTotal').textContent='0';
+  document.getElementById('syncFill').style.width='0%';
+  document.getElementById('syncMsg').textContent='Initialisation...';
+  document.getElementById('syncPct').textContent='0%';
+
+  // Construire cache GLOBAL une seule fois (toutes les données historiques)
+  var cache=buildCache();
+  var track=getTrack();
+  var added=0,skipped=0,processed=0;
+  var total=candidates.length;
+
+  function processChunk(idx){
+    if(!_syncRunning){
+      finishSync(added,skipped,total,'Arrêté');return;
+    }
+    if(idx>=total){
+      // Sauvegarder le tracking mis à jour
+      setTrack(track);
+      // Auto-calibration
+      computeAndSaveCalib(track,seuilFiab);
+      finishSync(added,skipped,total,'Terminé');
+      return;
+    }
+    // Traiter par lots de 10 pour ne pas bloquer l'UI
+    var end=Math.min(idx+10,total);
+    for(var i=idx;i<end;i++){
+      var m=candidates[i];
+      var alreadyTracked=track.find(function(t){return t.id===m.id});
+      if(alreadyTracked&&!overwrite){
+        skipped++;
+      } else {
+        // Recalcul de la prédiction rétrospectivement
+        var pred=predict(m,cache,seuilTd,null);
+        var entry=buildTrackEntry(m,pred,seuilTd,m.h,m.a);
+        entry.sync=true; // marquer comme sync rétroactive
+        if(alreadyTracked&&overwrite){
+          var ti=track.indexOf(alreadyTracked);
+          track[ti]=entry;
+        } else {
+          track.push(entry);
+        }
+        added++;
+      }
+      processed++;
+    }
+    // Mise à jour UI
+    var pct=Math.round(processed/total*100);
+    document.getElementById('syncFill').style.width=pct+'%';
+    document.getElementById('syncPct').textContent=pct+'%';
+    document.getElementById('syncAdded').textContent=added;
+    document.getElementById('syncSkipped').textContent=skipped;
+    document.getElementById('syncTotal').textContent=processed;
+    document.getElementById('syncMsg').textContent='Traitement '+processed+'/'+total+'...';
+    setTimeout(function(){processChunk(end)},0);
+  }
+  processChunk(0);
+}
+function finishSync(added,skipped,total,status){
+  _syncRunning=false;
+  document.getElementById('btnSync').disabled=false;
+  document.getElementById('btnSyncStop').style.display='none';
+  document.getElementById('syncMsg').textContent=status+' — '+added+' ajoutés, '+skipped+' ignorés sur '+total;
+  document.getElementById('syncPct').textContent='100%';
+  document.getElementById('syncFill').style.width='100%';
+  document.getElementById('syncFill').style.background=added>0?'var(--g)':'var(--y)';
+  // Relancer l'affichage fiabilité automatiquement si données dispo
+  var track=getTrack();
+  if(track.length){
+    hideAl('fiabAl');
+    renderFiabOut();
+  }
+}
+
 function calcFiabilite(){
   var track=getTrack();
   if(!track.length){showAl('fiabAl','er','Aucune donnée - Charge des matchs terminés dans l\'onglet Matchs');return}
@@ -2741,6 +2888,7 @@ document.getElementById('tdDate').value=today();
 document.getElementById('tkDate').value=today();
 initMultiTab();
 renderAnHist();
+initStDates();initSyncDates();
 </script>
 </body>
 </html>
