@@ -373,6 +373,8 @@ tr:hover td{background:var(--s2)}
 .profile-stat span:last-child{color:var(--tx);font-weight:500}
 /* LIVE BADGE */
 .live-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:.58rem;font-weight:700;background:rgba(0,196,204,.07);border:1px solid rgba(0,196,204,.25);color:var(--teal);font-family:var(--mono);margin-top:5px}
+.badge-00{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:.58rem;font-weight:700;background:rgba(176,107,255,.1);border:1px solid rgba(176,107,255,.35);color:var(--p);font-family:var(--mono);margin-top:4px;margin-right:4px}
+.badge-00.hi{background:rgba(176,107,255,.2);border-color:rgba(176,107,255,.6)}
 /* WARN */
 .warn-banner{background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.25);border-radius:7px;padding:9px 12px;font-size:.66rem;color:var(--y);margin-bottom:10px;line-height:1.5;font-family:var(--mono)}
 .info-api{background:rgba(61,155,255,.06);border:1px solid rgba(61,155,255,.25);border-radius:9px;padding:10px 12px;font-size:.68rem;color:var(--b);margin-bottom:10px;line-height:1.6}
@@ -1030,6 +1032,15 @@ tr:hover td{background:var(--s2)}
   </div>
   <div class="al" id="fiabAl"></div>
   <div id="fiabOut" style="display:none"></div>
+
+  <!-- MODULE 0-0 -->
+  <div class="st" style="margin-top:16px">&#x1F512; Score 0-0 &#x2014; Analyse &amp; Corr&#xe9;lations</div>
+  <div class="card">
+    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Analyse tous les matchs termin&#xe9;s en base. Fr&#xe9;quence, corr&#xe9;lations ligue/heure/jour, &#xe9;quipes, H2H, et march&#xe9;s associ&#xe9;s.</p>
+    <button class="btn" style="background:linear-gradient(135deg,#1a0a2e,#2d0845);border:1px solid rgba(176,107,255,.4);color:var(--p);font-size:.8rem;margin-bottom:0" onclick="calc00()">&#x1F512; Calculer l'analyse 0-0</button>
+  </div>
+  <div class="al" id="al00"></div>
+  <div id="out00" style="display:none"></div>
 </div>
 
 <!-- MODAL RÉSULTAT FOOTSTATS -->
@@ -1191,11 +1202,13 @@ async function apiCall(endpoint,params){
 // ═══════════════════════════════════ UI HELPERS ═══
 function goTab(i){
   document.querySelectorAll('.tab').forEach(function(t,j){t.classList.toggle('on',i===j)});
-  document.querySelectorAll('.panel').forEach(function(p,j){p.classList.toggle('on',i===j)});
-  if(i===0)majDB();
+  // Cible tous les panels par id p0..p7
+  for(var k=0;k<=7;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
+  if(i===1)majDB();
   if(i===4)initStDates();
   if(i===3){renderAnHist();renderDash();initMultiTab()}
   if(i===6)document.getElementById('tkDate').value=today();
+  if(i===7)initSyncDates();
 }
 function showAl(id,t,msg){var e=document.getElementById(id);e.className='al on a'+t;e.innerHTML=msg}
 function hideAl(id){document.getElementById(id).className='al'}
@@ -2271,6 +2284,9 @@ function buildMatchHTML(m,pred,s){
     if(ld&&ld.total)html+=' · Jour: '+ld.total+' terminés';
     html+='</div>';
   }
+  // Badge 0-0
+  var p00=compute00Badge(m,pred);
+  if(p00!==null){var c00=p00>=30?'hi':'';html+='<div class="badge-00 '+c00+'">&#x1F512; 0-0 : '+p00+'%</div>'}
   html+='<div class="conf-bar" style="margin-top:7px"><div class="conf-track"><div class="conf-fill" style="width:'+pred.conf+'%;background:var(--g)"></div></div><span class="conf-lbl">Conf. '+pred.conf+'% · '+pred.ligTotal+' hist.'+(pred.moyButs?' · '+pred.moyButs+' buts/m':'')+'</span></div>';
   return html;
 }
@@ -2680,6 +2696,214 @@ function setFiabView(v){
   document.querySelectorAll('.fiab-tab').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)});
   renderFiabOut();
 }
+// ═══════════════════════════════════ MODULE 0-0 ═══
+function get00Stats(){
+  var db=getDB(),all=[];
+  Object.keys(db).forEach(function(d){
+    (db[d]||[]).forEach(function(m){
+      if(TERM.indexOf(m.status)>=0&&m.h!==null&&m.a!==null)all.push(m);
+    });
+  });
+  return all;
+}
+// Calcule probabilité 0-0 pour badge sur match card
+function compute00Badge(m,pred){
+  var all=get00Stats();
+  if(all.length<10)return null;
+  // Base rate 0-0 globale
+  var total=all.length,nb00=all.filter(function(x){return x.h===0&&x.a===0}).length;
+  var baseRate=nb00/total;
+  // Facteur ligue
+  var ligMs=all.filter(function(x){return x.league===m.league});
+  var ligRate=ligMs.length>=5?(ligMs.filter(function(x){return x.h===0&&x.a===0}).length/ligMs.length):baseRate;
+  // Facteur heure
+  var hour=m.heure?(parseInt(m.heure.split(':')[0])||null):null;
+  var hourMs=hour!==null?all.filter(function(x){return x.heure&&parseInt(x.heure.split(':')[0])===hour}):[];
+  var hourRate=hourMs.length>=5?(hourMs.filter(function(x){return x.h===0&&x.a===0}).length/hourMs.length):baseRate;
+  // Facteur Under 0.5 / bttsNon depuis pred
+  var modelFactor=1.0;
+  if(pred){
+    if(pred.bttsNon!==null&&pred.bttsNon>0.6)modelFactor=1.3;
+    else if(pred.bttsNon!==null&&pred.bttsNon<0.35)modelFactor=0.6;
+    if(pred.under!==null&&pred.under>0.6)modelFactor*=1.15;
+  }
+  // Score pondéré
+  var score=(ligRate*0.45+hourRate*0.25+baseRate*0.30)*modelFactor;
+  return Math.min(99,Math.round(score*100));
+}
+
+function calc00(){
+  var all=get00Stats();
+  if(all.length<5){showAl('al00','er','Pas assez de matchs en base (minimum 5). Lance d\'abord une collecte.');return}
+  var total=all.length;
+  var ms00=all.filter(function(m){return m.h===0&&m.a===0});
+  var n00=ms00.length;
+  var rate=n00/total;
+
+  // ─── Par ligue ───
+  var ligMap={};
+  all.forEach(function(m){
+    var k=m.league||'?';
+    if(!ligMap[k])ligMap[k]={total:0,n00:0};
+    ligMap[k].total++;
+    if(m.h===0&&m.a===0)ligMap[k].n00++;
+  });
+  var ligArr=Object.keys(ligMap).map(function(k){return{name:k,total:ligMap[k].total,n00:ligMap[k].n00,rate:ligMap[k].n00/ligMap[k].total}}).filter(function(x){return x.total>=5}).sort(function(a,b){return b.rate-a.rate});
+
+  // ─── Par heure ───
+  var hourMap={};
+  all.forEach(function(m){
+    var h=m.heure?m.heure.split(':')[0]:'?';
+    if(!hourMap[h])hourMap[h]={total:0,n00:0};
+    hourMap[h].total++;
+    if(m.h===0&&m.a===0)hourMap[h].n00++;
+  });
+  var hourArr=Object.keys(hourMap).map(function(h){return{h:h,total:hourMap[h].total,n00:hourMap[h].n00,rate:hourMap[h].n00/hourMap[h].total}}).filter(function(x){return x.total>=3}).sort(function(a,b){return b.rate-a.rate});
+
+  // ─── Par jour ───
+  var DAYS=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  var dayMap={};
+  all.forEach(function(m){
+    if(!m.date)return;
+    var d=new Date(m.date).getDay();var k=DAYS[d]||'?';
+    if(!dayMap[k])dayMap[k]={total:0,n00:0};
+    dayMap[k].total++;
+    if(m.h===0&&m.a===0)dayMap[k].n00++;
+  });
+  var dayArr=DAYS.map(function(d){var e=dayMap[d]||{total:0,n00:0};return{d:d,total:e.total,n00:e.n00,rate:e.total>0?e.n00/e.total:0}}).filter(function(x){return x.total>0});
+
+  // ─── Équipes ───
+  var teamH={},teamA={};
+  all.forEach(function(m){
+    var h=m.home||'?',a=m.away||'?';
+    if(!teamH[h])teamH[h]={total:0,n00:0};teamH[h].total++;if(m.h===0&&m.a===0)teamH[h].n00++;
+    if(!teamA[a])teamA[a]={total:0,n00:0};teamA[a].total++;if(m.h===0&&m.a===0)teamA[a].n00++;
+  });
+  var topH=Object.keys(teamH).filter(function(k){return teamH[k].total>=3}).map(function(k){return{name:k,total:teamH[k].total,n00:teamH[k].n00,rate:teamH[k].n00/teamH[k].total}}).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
+  var topA=Object.keys(teamA).filter(function(k){return teamA[k].total>=3}).map(function(k){return{name:k,total:teamA[k].total,n00:teamA[k].n00,rate:teamA[k].n00/teamA[k].total}}).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
+
+  // ─── H2H ───
+  var h2hMap={};
+  all.forEach(function(m){
+    var k=[m.home,m.away].sort().join(' vs ');
+    if(!h2hMap[k])h2hMap[k]={total:0,n00:0};h2hMap[k].total++;if(m.h===0&&m.a===0)h2hMap[k].n00++;
+  });
+  var topH2H=Object.keys(h2hMap).filter(function(k){return h2hMap[k].total>=2&&h2hMap[k].n00>0}).map(function(k){return{name:k,total:h2hMap[k].total,n00:h2hMap[k].n00,rate:h2hMap[k].n00/h2hMap[k].total}}).sort(function(a,b){return b.n00-a.n00||b.rate-a.rate}).slice(0,8);
+
+  // ─── Corrélations avec marchés (sur les matchs trackés) ───
+  var track=getTrack();
+  var mktCorr={};
+  var MKTS=['plus','under','btts','bttsNon','v1','x','v2','csH','csA'];
+  var MLBLS={plus:'Over +seuil',under:'Under -seuil',btts:'BTTS Oui',bttsNon:'BTTS Non',v1:'Victoire Dom',x:'Match Nul',v2:'Victoire Ext',csH:'CS Dom',csA:'CS Ext'};
+  MKTS.forEach(function(k){mktCorr[k]={both:0,only00:0,onlyMkt:0,neither:0}});
+  track.forEach(function(t){
+    if(t.h===undefined||t.a===undefined)return;
+    var is00=t.h===0&&t.a===0;
+    MKTS.forEach(function(k){
+      var pred=t.pred&&t.pred[k]!==undefined?t.pred[k]:null;
+      if(pred===null)return;
+      var mktPred=pred>=0.5;
+      if(is00&&mktPred)mktCorr[k].both++;
+      else if(is00&&!mktPred)mktCorr[k].only00++;
+      else if(!is00&&mktPred)mktCorr[k].onlyMkt++;
+      else mktCorr[k].neither++;
+    });
+  });
+
+  // ─── RENDER ───
+  var pct=Math.round(rate*100);
+  var html='<div class="card">';
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">';
+  html+='<div class="sb"><div class="sv" style="color:var(--p);font-size:2rem">'+pct+'%</div><div class="sl">Taux global 0-0</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+n00+'</div><div class="sl">Matchs 0-0</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--dm)">'+total+'</div><div class="sl">Total matchs</div></div>';
+  html+='</div>';
+
+  // Ligue
+  if(ligArr.length){
+    html+='<div class="st" style="margin-bottom:8px">Par ligue</div>';
+    html+='<div class="bars">';
+    ligArr.slice(0,10).forEach(function(l){
+      var p=Math.round(l.rate*100);var col=p>=15?'var(--p)':p>=8?'var(--y)':'var(--dm)';
+      html+='<div class="br2"><div class="bn">'+l.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:'+col+'">'+p+'% ('+l.n00+'/'+l.total+')</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Heure
+  if(hourArr.length){
+    html+='<div class="st" style="margin:12px 0 8px">Par heure de coup d\'envoi</div>';
+    html+='<div class="bars">';
+    hourArr.forEach(function(h){
+      var p=Math.round(h.rate*100);var col=p>=15?'var(--p)':p>=8?'var(--y)':'var(--dm)';
+      html+='<div class="br2"><div class="bn" style="width:40px">'+h.h+'h</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:'+col+'">'+p+'% ('+h.n00+'/'+h.total+')</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Jour
+  if(dayArr.length){
+    html+='<div class="st" style="margin:12px 0 8px">Par jour de la semaine</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+    dayArr.forEach(function(d){
+      var p=Math.round(d.rate*100);var col=p>=15?'var(--p)':p>=8?'var(--y)':'var(--dm)';
+      html+='<div style="text-align:center;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 4px"><div style="font-size:1rem;font-weight:900;color:'+col+'">'+p+'%</div><div style="font-size:.52rem;color:var(--dm);font-family:var(--mono)">'+d.d+'</div><div style="font-size:.5rem;color:var(--dm)">'+d.n00+'/'+d.total+'</div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Équipes domicile
+  if(topH.length){
+    html+='<div class="st" style="margin:12px 0 8px">Top équipes 0-0 à domicile</div>';
+    html+='<div class="bars">';
+    topH.forEach(function(t){
+      var p=Math.round(t.rate*100);
+      html+='<div class="br2"><div class="bn">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--p)">'+p+'% ('+t.n00+'/'+t.total+')</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Équipes extérieur
+  if(topA.length){
+    html+='<div class="st" style="margin:12px 0 8px">Top équipes 0-0 à l\'ext&#xe9;rieur</div>';
+    html+='<div class="bars">';
+    topA.forEach(function(t){
+      var p=Math.round(t.rate*100);
+      html+='<div class="br2"><div class="bn">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--teal)">'+p+'% ('+t.n00+'/'+t.total+')</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // H2H
+  if(topH2H.length){
+    html+='<div class="st" style="margin:12px 0 8px">Paires H2H avec le plus de 0-0</div>';
+    html+='<div class="bars">';
+    topH2H.forEach(function(t){
+      var p=Math.round(t.rate*100);
+      html+='<div class="br2"><div class="bn" style="width:130px">'+t.name.substring(0,20)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--y)">'+t.n00+' 0-0 / '+t.total+' ('+p+'%)</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Corrélations marchés
+  if(track.length>=5){
+    html+='<div class="st" style="margin:12px 0 8px">Corrélations marchés → 0-0</div>';
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px">Sur '+track.length+' matchs trackés — quand le marché était prédit, combien se sont terminés 0-0 ?</div>';
+    html+='<div class="tbl"><table><thead><tr><th>Marché prédit</th><th>Matchs</th><th>0-0 dedans</th><th>Taux</th></tr></thead><tbody>';
+    MKTS.forEach(function(k){
+      var c=mktCorr[k];var tot=c.both+c.onlyMkt;if(tot<3)return;
+      var p=Math.round(c.both/tot*100);var col=p>=20?'tg':p>=10?'ty':'';
+      html+='<tr><td>'+MLBLS[k]+'</td><td>'+tot+'</td><td>'+c.both+'</td><td class="'+col+'">'+p+'%</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-top:6px;line-height:1.6">&#x1F4A1; Un taux &gt;20% signifie que quand ce march&#xe9; est pr&#xe9;dit, le 0-0 arrive souvent &#x2192; signal fort.<br>Le march&#xe9; <strong style="color:var(--p)">BTTS Non + Under</strong> pr&#xe9;dit ensemble est le meilleur indicateur 0-0.</div>';
+  }
+
+  html+='</div>';
+  var out=document.getElementById('out00');
+  out.innerHTML=html;out.style.display='block';
+}
+
 // ═══════════════════════════════════ SYNC GLOBALE ═══
 var _syncRunning=false;
 function stopSync(){_syncRunning=false;}
