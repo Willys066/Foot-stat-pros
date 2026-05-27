@@ -570,7 +570,7 @@ tr:hover td{background:var(--s2)}
       <div class="sb"><div class="sv" id="tDon" style="color:var(--g)">0</div><div class="sl">Terminés</div></div>
     </div>
   </div>
-  <div style="display:flex;gap:7px;margin-bottom:8px" id="tdExpandBar" style="display:none">
+  <div id="tdExpandBar" style="display:none;gap:7px;margin-bottom:8px">
     <button class="bsm" onclick="toggleAllGroups(true)" style="flex:1;padding:7px;text-align:center;color:var(--g);border-color:var(--g)">▼ Tout ouvrir</button>
     <button class="bsm" onclick="toggleAllGroups(false)" style="flex:1;padding:7px;text-align:center">▲ Tout fermer</button>
   </div>
@@ -2402,14 +2402,23 @@ function renderMatchsList(){
       var resHTML='';
       if(res){var tot=res.h+res.a,v1x2r=res.h>res.a?'V1':res.h<res.a?'V2':'X',ok=tot>seuilTd;resHTML='<div class="mr"><div class="rr"><span style="color:var(--dm)">Résultat</span><span style="font-weight:700">'+res.h+' - '+res.a+' ('+v1x2r+')</span></div><div class="rr"><span style="color:var(--dm)">+'+seuilTd+'</span><span style="color:'+(ok?'var(--g)':'var(--r)')+'">'+( ok?'OUI':'NON')+'</span></div><div class="rr"><span style="color:var(--dm)">BTTS</span><span style="color:'+(res.h>0&&res.a>0?'var(--g)':'var(--r)')+'">'+( res.h>0&&res.a>0?'OUI':'NON')+'</span></div></div>'}
       var card=document.createElement('div');card.className='mc '+cls;card.style.marginBottom='7px';
-      card.innerHTML='<div class="mt-row"><div class="ml">'+m.heure+'</div><div class="ms '+scls+'">'+stxt+'</div></div>'
-        +'<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'
-        +buildMatchHTML(m,pred,seuilTd)+resHTML
-        +'<div style="display:flex;gap:6px;margin-top:6px">'
-        +(!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')
-        +'<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">⚡ Analyser</button>'
-        +'<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">&#x1F4CA; Sc&#xe9;nario</button>'
-        +'</div>';
+      try{
+        card.innerHTML='<div class="mt-row"><div class="ml">'+m.heure+'</div><div class="ms '+scls+'">'+stxt+'</div></div>'
+          +'<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'
+          +buildMatchHTML(m,pred,seuilTd)+resHTML
+          +'<div style="display:flex;gap:6px;margin-top:6px">'
+          +(!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')
+          +'<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">⚡ Analyser</button>'
+          +'<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">&#x1F4CA; Sc&#xe9;nario</button>'
+          +'</div>';
+      }catch(e){
+        card.innerHTML='<div class="mt-row"><div class="ml">'+m.heure+'</div><div class="ms '+scls+'">'+stxt+'</div></div>'
+          +'<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'
+          +'<div style="font-size:.6rem;color:var(--r);padding:5px;font-family:var(--mono)">Erreur: '+e.message+'</div>'
+          +'<div style="display:flex;gap:6px;margin-top:6px">'
+          +(!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')
+          +'</div>';
+      }
       bodyDiv.appendChild(card);
     });
     groupDiv.appendChild(headerDiv);groupDiv.appendChild(bodyDiv);list.appendChild(groupDiv);
