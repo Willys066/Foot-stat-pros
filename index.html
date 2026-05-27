@@ -570,6 +570,10 @@ tr:hover td{background:var(--s2)}
       <div class="sb"><div class="sv" id="tDon" style="color:var(--g)">0</div><div class="sl">Terminés</div></div>
     </div>
   </div>
+  <div style="display:flex;gap:7px;margin-bottom:8px" id="tdExpandBar" style="display:none">
+    <button class="bsm" onclick="toggleAllGroups(true)" style="flex:1;padding:7px;text-align:center;color:var(--g);border-color:var(--g)">▼ Tout ouvrir</button>
+    <button class="bsm" onclick="toggleAllGroups(false)" style="flex:1;padding:7px;text-align:center">▲ Tout fermer</button>
+  </div>
   <div id="tdList"></div>
 </div>
 
@@ -2350,6 +2354,10 @@ async function loadMatchs(source){
   document.getElementById('tdSum').style.display='block';
   renderMatchsList();
 }
+function toggleAllGroups(open){
+  document.querySelectorAll('.lg-body').forEach(function(b){b.classList.toggle('open',open)});
+  document.querySelectorAll('.lg-header').forEach(function(h){h.classList.toggle('open',open)});
+}
 function renderMatchsList(){
   window._matchRefs=[];var list=document.getElementById('tdList');list.innerHTML='';
   var fx=allMatchsCache.filter(function(m){if(convFilterVal===0)return true;return(m._pred?m._pred.convergence:0)>=convFilterVal});
@@ -2375,7 +2383,11 @@ function renderMatchsList(){
     var headerDiv=document.createElement('div');headerDiv.className='lg-header';
     headerDiv.innerHTML='<div class="lg-header-left"><div class="lg-name">'+g.league+'</div><div class="lg-country">'+g.country+(ligRateLabel?' · '+ligRateLabel:'')+'</div></div><div class="lg-badges"><span class="lg-nb">'+g.matchs.length+' match'+(g.matchs.length>1?'s':'')+'</span>'+(ligRate!==null?'<span class="lbg '+lgBgCls+'" style="font-size:.7rem;padding:3px 8px;border-radius:5px">'+ligRate+'%</span>':'')+(highCorrelation?'<span class="lg-warn">⚠ corr.</span>':'')+'</div><span class="lg-arrow">▶</span>';
     var bodyDiv=document.createElement('div');
-    var defaultOpen=Object.keys(groups).length<=3||g.matchs.some(function(m){return(m._pred?m._pred.convergence:0)>=2});
+    // Ouvrir : groupes live, ou liste courte, ou convergence haute — fermer les groupes 100% terminés
+    var hasLive=g.matchs.some(function(m){return LIVE.indexOf(m.status)>=0});
+    var hasSoon=g.matchs.some(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
+    var hasHighConv=g.matchs.some(function(m){return(m._pred?m._pred.convergence:0)>=2});
+    var defaultOpen=hasLive||hasSoon||Object.keys(groups).length<=4||hasHighConv;
     bodyDiv.className='lg-body'+(defaultOpen?' open':'');headerDiv.classList.toggle('open',defaultOpen);
     headerDiv.onclick=function(){bodyDiv.classList.toggle('open');this.classList.toggle('open')};
     g.matchs.forEach(function(m){
@@ -2402,6 +2414,11 @@ function renderMatchsList(){
     });
     groupDiv.appendChild(headerDiv);groupDiv.appendChild(bodyDiv);list.appendChild(groupDiv);
   });
+  // Afficher la barre expand/collapse
+  var bar=document.getElementById('tdExpandBar');if(bar)bar.style.display='flex';
+  // Auto-scroll vers le premier groupe live si présent
+  var firstLive=list.querySelector('.mc.live');
+  if(firstLive)setTimeout(function(){firstLive.scrollIntoView({behavior:'smooth',block:'center'})},200);
 }
 // ═══════════════════════════════════ SCÉNARIO MATCH ═══
 function closeScenarioModal(e){if(e.target.id==='modalScenario')document.getElementById('modalScenario').classList.remove('on')}
