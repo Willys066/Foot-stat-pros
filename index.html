@@ -2344,7 +2344,11 @@ async function loadMatchs(source){
   else if(mode==='live')fxF=fx.filter(function(f){return LIVE.indexOf(f.status)>=0});
   else fxF=fx.slice();
   var liveCtx=buildLiveContext(fxF,seuilTd);
-  fxF.forEach(function(m){m._pred=cache.total>0?predict(m,cache,seuilTd,liveCtx):null});
+  // Toujours tenter predict même si cache faible - afficher matchs dans tous les cas
+  fxF.forEach(function(m){
+    try{m._pred=cache.total>0?predict(m,cache,seuilTd,liveCtx):null;}
+    catch(e){m._pred=null;}
+  });
   fxF.sort(function(a,b){var ca=a._pred?a._pred.convergence:-1,cb=b._pred?b._pred.convergence:-1;if(cb!==ca)return cb-ca;return(a.heure||'').localeCompare(b.heure||'')});
   allMatchsCache=fxF;
   document.getElementById('tTot').textContent=fx.length;
@@ -2387,7 +2391,8 @@ function renderMatchsList(){
     var hasLive=g.matchs.some(function(m){return LIVE.indexOf(m.status)>=0});
     var hasSoon=g.matchs.some(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
     var hasHighConv=g.matchs.some(function(m){return(m._pred?m._pred.convergence:0)>=2});
-    var defaultOpen=hasLive||hasSoon||Object.keys(groups).length<=4||hasHighConv;
+    var noPredData=g.matchs.every(function(m){return!m._pred});
+    var defaultOpen=hasLive||hasSoon||noPredData||Object.keys(groups).length<=4||hasHighConv;
     bodyDiv.className='lg-body'+(defaultOpen?' open':'');headerDiv.classList.toggle('open',defaultOpen);
     headerDiv.onclick=function(){bodyDiv.classList.toggle('open');this.classList.toggle('open')};
     g.matchs.forEach(function(m){
