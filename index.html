@@ -373,6 +373,21 @@ tr:hover td{background:var(--s2)}
 .profile-stat span:last-child{color:var(--tx);font-weight:500}
 /* LIVE BADGE */
 .live-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:.58rem;font-weight:700;background:rgba(0,196,204,.07);border:1px solid rgba(0,196,204,.25);color:var(--teal);font-family:var(--mono);margin-top:5px}
+.sc-block{background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:12px;margin-bottom:8px}
+.sc-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;font-size:.62rem;font-weight:700;font-family:var(--mono);margin:2px}
+.sc-tag-g{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--g)}
+.sc-tag-r{background:rgba(255,61,90,.1);border:1px solid rgba(255,61,90,.3);color:var(--r)}
+.sc-tag-y{background:rgba(255,199,44,.1);border:1px solid rgba(255,199,44,.3);color:var(--y)}
+.sc-tag-p{background:rgba(176,107,255,.1);border:1px solid rgba(176,107,255,.3);color:var(--p)}
+.sc-tag-d{background:rgba(74,96,128,.1);border:1px solid rgba(74,96,128,.3);color:var(--dm)}
+.sc-verdict{font-size:1.3rem;font-weight:900;letter-spacing:2px;margin-bottom:6px}
+.sc-reason{font-size:.68rem;color:var(--dm);font-family:var(--mono);line-height:1.7;margin-top:6px}
+.sc-scores{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+.sc-score-box{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;text-align:center;min-width:55px}
+.sc-score-val{font-size:1.1rem;font-weight:900;color:var(--tx)}
+.sc-score-pct{font-size:.55rem;color:var(--dm);font-family:var(--mono)}
+.sc-fiab-bar{height:4px;border-radius:2px;background:var(--s3);margin-top:4px;overflow:hidden}
+.sc-fiab-fill{height:100%;border-radius:2px}
 .badge-00{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:.58rem;font-weight:700;background:rgba(176,107,255,.1);border:1px solid rgba(176,107,255,.35);color:var(--p);font-family:var(--mono);margin-top:4px;margin-right:4px}
 .badge-00.hi{background:rgba(176,107,255,.2);border-color:rgba(176,107,255,.6)}
 /* WARN */
@@ -1041,6 +1056,16 @@ tr:hover td{background:var(--s2)}
   </div>
   <div class="al" id="al00"></div>
   <div id="out00" style="display:none"></div>
+</div>
+
+<!-- MODAL SCÉNARIO -->
+<div class="mo" id="modalScenario" onclick="closeScenarioModal(event)">
+  <div class="mb" style="max-height:88vh;overflow-y:auto">
+    <div class="mt2" id="scTitle" style="font-size:1rem;letter-spacing:2px">SCÉNARIO MATCH</div>
+    <div id="scMatchName" style="font-size:.78rem;color:var(--dm);font-family:var(--mono);margin-bottom:12px"></div>
+    <div id="scContent"></div>
+    <button class="bsm" onclick="document.getElementById('modalScenario').classList.remove('on')" style="width:100%;margin-top:12px;padding:10px;text-align:center">Fermer</button>
+  </div>
 </div>
 
 <!-- MODAL RÉSULTAT FOOTSTATS -->
@@ -2371,12 +2396,225 @@ function renderMatchsList(){
         +'<div style="display:flex;gap:6px;margin-top:6px">'
         +(!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')
         +'<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">⚡ Analyser</button>'
+        +'<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">&#x1F4CA; Sc&#xe9;nario</button>'
         +'</div>';
       bodyDiv.appendChild(card);
     });
     groupDiv.appendChild(headerDiv);groupDiv.appendChild(bodyDiv);list.appendChild(groupDiv);
   });
 }
+// ═══════════════════════════════════ SCÉNARIO MATCH ═══
+function closeScenarioModal(e){if(e.target.id==='modalScenario')document.getElementById('modalScenario').classList.remove('on')}
+
+function openScenarioModal(idx){
+  var match=typeof idx==='number'?window._matchRefs[idx]:idx;
+  if(!match||!match._pred){
+    document.getElementById('scContent').innerHTML='<div style="color:var(--dm);font-size:.8rem;padding:20px;text-align:center">Pas assez de donn&#xe9;es pour g&#xe9;n&#xe9;rer un sc&#xe9;nario.</div>';
+    document.getElementById('scMatchName').textContent='';
+    document.getElementById('modalScenario').classList.add('on');
+    return;
+  }
+  document.getElementById('scMatchName').textContent=match.home+' vs '+match.away+(match.league?' · '+match.league:'');
+  document.getElementById('scContent').innerHTML=buildScenario(match,match._pred,match._seuil||seuilTd);
+  document.getElementById('modalScenario').classList.add('on');
+}
+
+function buildScenario(match,pred,s){
+  // ── 1. Récupérer fiabilités depuis tracking ──
+  var calib=getCalib();
+  var fiab={};
+  var KEYS=['plus','under','btts','bttsNon','v1','x','v2','csH','csA','hmsc','amsc','dc1x','dcx2','dc12'];
+  KEYS.forEach(function(k){
+    fiab[k]=calib[k]&&calib[k].prec!==undefined?calib[k].prec:null;
+  });
+
+  // ── 2. Construire liste signaux fiables (prec >= 50% ou pas de data) ──
+  var sig=[];
+  function addSig(key,label,val,inverse){
+    if(val===null||val===undefined)return;
+    var f=fiab[key];
+    var fiabOk=(f===null||f>=50); // null = pas de tracking = on garde
+    if(!fiabOk)return; // ignorer marché peu fiable
+    var pct=Math.round(val*100);
+    var dir=inverse?(100-pct):pct; // probabilité dans le bon sens
+    sig.push({key:key,label:label,val:val,pct:pct,fiab:f,dir:dir});
+  }
+  addSig('plus','Over +'+s,pred.plus,false);
+  addSig('under','Under -'+s,pred.under,false);
+  addSig('btts','BTTS Oui',pred.btts,false);
+  addSig('bttsNon','BTTS Non',pred.bttsNon,false);
+  addSig('v1','Victoire Dom',pred.v1,false);
+  addSig('x','Match Nul',pred.x,false);
+  addSig('v2','Victoire Ext',pred.v2,false);
+  addSig('csH','CS Dom',pred.csH,false);
+  addSig('csA','CS Ext',pred.csA,false);
+  addSig('hmsc','Dom marque',pred.hmsc,false);
+  addSig('amsc','Ext marque',pred.amsc,false);
+
+  // ── 3. Extraire signaux forts (>= 60%) ──
+  var strong=sig.filter(function(s){return s.pct>=60}).sort(function(a,b){return b.pct-a.pct});
+  var moderate=sig.filter(function(s){return s.pct>=50&&s.pct<60}).sort(function(a,b){return b.pct-a.pct});
+
+  // ── 4. Déduction logique des buts par équipe ──
+  var homeMark=sig.find(function(s){return s.key==='hmsc'});
+  var awayMark=sig.find(function(s){return s.key==='amsc'});
+  var bttsS=sig.find(function(s){return s.key==='btts'});
+  var bttsNS=sig.find(function(s){return s.key==='bttsNon'});
+  var csHS=sig.find(function(s){return s.key==='csH'});
+  var csAS=sig.find(function(s){return s.key==='csA'});
+  var overS=sig.find(function(s){return s.key==='plus'});
+  var underS=sig.find(function(s){return s.key==='under'});
+  var v1S=sig.find(function(s){return s.key==='v1'});
+  var xS=sig.find(function(s){return s.key==='x'});
+  var v2S=sig.find(function(s){return s.key==='v2'});
+
+  // Probabilité que chaque équipe marque
+  var pHome=homeMark?homeMark.pct:(bttsS?Math.round((bttsS.pct+55)/2):50);
+  var pAway=awayMark?awayMark.pct:(bttsS?Math.round((bttsS.pct+45)/2):45);
+
+  // BTTS probable ?
+  var bttsProbable=bttsS&&bttsS.pct>=60;
+  var bttsNonProbable=bttsNS&&bttsNS.pct>=60;
+  var overProbable=overS&&overS.pct>=60;
+  var underProbable=underS&&underS.pct>=60;
+
+  // ── 5. Scénario dominant ──
+  var scenarioType='',scenarioColor='var(--y)',scenarioEmoji='⚖️';
+  var scenarioDesc='';
+
+  if(bttsProbable&&overProbable){
+    scenarioType='MATCH OUVERT';scenarioColor='var(--g)';scenarioEmoji='⚽';
+    scenarioDesc='Les deux &#xe9;quipes marquent probablement. Volume de buts &#xe9;lev&#xe9; attendu. Match avec actions des deux c&#xf4;t&#xe9;s.';
+  } else if(bttsNonProbable&&underProbable){
+    scenarioType='MATCH FERM&#xc9;';scenarioColor='var(--r)';scenarioEmoji='&#x1F512;';
+    scenarioDesc='Une seule &#xe9;quipe marque ou 0-0. D&#xe9;fenses dominantes. Peu de buts attendus.';
+  } else if(bttsProbable&&underProbable){
+    scenarioType='SERR&#xc9; &amp; BTTS';scenarioColor='var(--y)';scenarioEmoji='&#x1F3AF;';
+    scenarioDesc='Les deux &#xe9;quipes marquent mais le total reste bas. Match &#xe9;quilibr&#xe9; avec un but de chaque c&#xf4;t&#xe9;.';
+  } else if(bttsNonProbable&&overProbable){
+    scenarioType='BUT UNILAT&#xc9;RAL';scenarioColor='var(--b)';scenarioEmoji='&#x1F4A5;';
+    scenarioDesc='Une &#xe9;quipe domine et marque plusieurs fois. L\'autre reste muette.';
+  } else if(v1S&&v1S.pct>=60&&csAS&&csAS.pct>=50){
+    scenarioType='DOMINATION DOMICILE';scenarioColor='var(--g)';scenarioEmoji='&#x1F3E0;';
+    scenarioDesc='Domicile contr&#xf4;le le match, l\'ext&#xe9;rieur n\'ouvre pas le score.';
+  } else if(v2S&&v2S.pct>=60&&csHS&&csHS.pct>=50){
+    scenarioType='VICTOIRE SURPRISE';scenarioColor='var(--p)';scenarioEmoji='&#x26A1;';
+    scenarioDesc='L\'&#xe9;quipe ext&#xe9;rieure prend l\'avantage, domicile ne marque pas.';
+  } else if(xS&&xS.pct>=55){
+    scenarioType='MATCH NUL PROBABLE';scenarioColor='var(--y)';scenarioEmoji='&#x1F91D;';
+    scenarioDesc='&#xc9;quilibre entre les &#xe9;quipes. Le partage des points est le d&#xe9;nouement le plus probable.';
+  } else {
+    scenarioType='INCERTAIN';scenarioColor='var(--dm)';scenarioEmoji='&#x2753;';
+    scenarioDesc='Les signaux sont contradictoires ou insuffisants. Fiabilit&#xe9; basse sur la plupart des march&#xe9;s.';
+  }
+
+  // ── 6. Scores les plus probables ──
+  var scores=[];
+  // Calculer scores selon déductions
+  if(bttsProbable){
+    if(overProbable){scores.push({s:'1-1',w:18});scores.push({s:'2-1',w:15});scores.push({s:'1-2',w:12});scores.push({s:'2-2',w:10});scores.push({s:'3-1',w:7})}
+    else{scores.push({s:'1-1',w:25});scores.push({s:'2-1',w:15});scores.push({s:'1-2',w:12});scores.push({s:'1-0',w:5});scores.push({s:'0-1',w:5})}
+  } else if(bttsNonProbable){
+    if(v1S&&v1S.pct>=(v2S?v2S.pct:0)){scores.push({s:'1-0',w:25});scores.push({s:'2-0',w:18});scores.push({s:'0-0',w:20});scores.push({s:'3-0',w:8});scores.push({s:'1-0',w:5})}
+    else if(v2S&&v2S.pct>=(v1S?v1S.pct:0)){scores.push({s:'0-1',w:25});scores.push({s:'0-2',w:18});scores.push({s:'0-0',w:20});scores.push({s:'0-3',w:7})}
+    else{scores.push({s:'0-0',w:30});scores.push({s:'1-0',w:20});scores.push({s:'0-1',w:15})}
+  } else {
+    scores.push({s:'1-1',w:18});scores.push({s:'1-0',w:16});scores.push({s:'0-1',w:12});scores.push({s:'0-0',w:12});scores.push({s:'2-1',w:10});
+  }
+  // Ajuster avec 1X2
+  if(v1S&&v1S.pct>=60){scores.forEach(function(sc){var g=sc.s.split('-');if(parseInt(g[0])>parseInt(g[1]))sc.w*=1.4;if(parseInt(g[0])<parseInt(g[1]))sc.w*=0.5})}
+  if(v2S&&v2S.pct>=60){scores.forEach(function(sc){var g=sc.s.split('-');if(parseInt(g[1])>parseInt(g[0]))sc.w*=1.4;if(parseInt(g[1])<parseInt(g[0]))sc.w*=0.5})}
+  if(xS&&xS.pct>=55){scores.forEach(function(sc){var g=sc.s.split('-');if(g[0]===g[1])sc.w*=1.5})}
+  // Normaliser
+  var tot=scores.reduce(function(a,b){return a+b.w},0);
+  scores.forEach(function(sc){sc.pct=Math.round(sc.w/tot*100)});
+  scores.sort(function(a,b){return b.pct-a.pct});
+  scores=scores.slice(0,4);
+  // Dédupliquer
+  var seen={};scores=scores.filter(function(sc){if(seen[sc.s])return false;seen[sc.s]=1;return true});
+
+  // ── 7. Confiance globale ──
+  var confSignals=strong.length;
+  var globalConf=confSignals>=4?'HAUTE':confSignals>=2?'MOYENNE':'BASSE';
+  var confColor=confSignals>=4?'var(--g)':confSignals>=2?'var(--y)':'var(--r)';
+
+  // ── 8. Construire HTML ──
+  var html='';
+
+  // Verdict principal
+  html+='<div class="sc-block" style="border-color:'+scenarioColor+';background:rgba(255,255,255,.02)">';
+  html+='<div class="sc-verdict" style="color:'+scenarioColor+'">'+scenarioEmoji+' '+scenarioType+'</div>';
+  html+='<div style="font-size:.72rem;color:var(--tx);line-height:1.6">'+scenarioDesc+'</div>';
+  html+='<div style="margin-top:8px;display:flex;align-items:center;gap:8px">';
+  html+='<span style="font-size:.58rem;font-family:var(--mono);color:var(--dm)">CONFIANCE GLOBALE</span>';
+  html+='<span style="font-weight:900;color:'+confColor+';font-size:.78rem">'+globalConf+'</span>';
+  html+='<span style="font-size:.58rem;font-family:var(--mono);color:var(--dm)">('+confSignals+' signal'+(confSignals>1?'s':'')+' forts)</span>';
+  html+='</div></div>';
+
+  // Scores probables
+  if(scores.length){
+    html+='<div class="sc-block">';
+    html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:8px">SCORES LES PLUS PROBABLES</div>';
+    html+='<div class="sc-scores">';
+    scores.forEach(function(sc,i){
+      var alpha=i===0?1:i===1?0.75:0.5;
+      html+='<div class="sc-score-box" style="border-color:'+(i===0?scenarioColor:'var(--bd)')+';opacity:'+alpha+'">';
+      html+='<div class="sc-score-val">'+sc.s+'</div>';
+      html+='<div class="sc-score-pct">~'+sc.pct+'%</div>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  }
+
+  // Signaux fiables actifs
+  if(strong.length||moderate.length){
+    html+='<div class="sc-block">';
+    html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:8px">MARCH&#xc9;S FIABLES ACTIFS</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    strong.forEach(function(sg){
+      var col=sg.pct>=70?'sc-tag-g':sg.pct>=60?'sc-tag-y':'sc-tag-y';
+      var fb=sg.fiab!==null?(' <span style="opacity:.6">· fiab '+sg.fiab+'%</span>'):'';
+      html+='<span class="sc-tag '+col+'">'+sg.label+': '+sg.pct+'%'+fb+'</span>';
+    });
+    moderate.forEach(function(sg){
+      var fb=sg.fiab!==null?(' · fiab '+sg.fiab+'%'):'';
+      html+='<span class="sc-tag sc-tag-d">'+sg.label+': '+sg.pct+'%'+fb+'</span>';
+    });
+    html+='</div></div>';
+  }
+
+  // Marchés exclus (peu fiables)
+  var excluded=KEYS.filter(function(k){
+    var f=fiab[k];return f!==null&&f<50&&pred[k]!==null&&pred[k]!==undefined;
+  });
+  if(excluded.length){
+    var lblMap={plus:'Over +'+s,under:'Under -'+s,btts:'BTTS Oui',bttsNon:'BTTS Non',v1:'Dom',x:'Nul',v2:'Ext',csH:'CS Dom',csA:'CS Ext',hmsc:'Dom Mq',amsc:'Ext Mq',dc1x:'DC1X',dcx2:'DCX2',dc12:'DC12'};
+    html+='<div class="sc-block" style="opacity:.6">';
+    html+='<div style="font-size:.6rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:6px">&#x26A0;&#xfe0f; IGNOR&#xc9;S (fiabilit&#xe9; < 50%)</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:3px">';
+    excluded.forEach(function(k){
+      html+='<span class="sc-tag sc-tag-d" style="opacity:.5">'+lblMap[k]+' (fiab '+Math.round(fiab[k])+'%)</span>';
+    });
+    html+='</div></div>';
+  }
+
+  // Note sur le 0-0
+  var p00=compute00Badge(match,pred);
+  if(p00!==null&&p00>=25){
+    html+='<div class="sc-block" style="border-color:rgba(176,107,255,.4)">';
+    html+='<div style="font-size:.68rem;color:var(--p);font-weight:700;margin-bottom:4px">&#x1F512; Risque 0-0 : '+p00+'%</div>';
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);line-height:1.6">Ce match pr&#xe9;sente un risque 0-0 '+(p00>=40?'&#xe9;lev&#xe9;':'mod&#xe9;r&#xe9;')+' bas&#xe9; sur l\'historique de la ligue et des patterns d&#xe9;fensifs.</div>';
+    html+='</div>';
+  }
+
+  // Avertissement si scénario incertain
+  if(scenarioType==='INCERTAIN'){
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);text-align:center;padding:8px;line-height:1.6">&#x26A0;&#xfe0f; Alimente plus de matchs dans le tracking<br>pour am&#xe9;liorer la fiabilit&#xe9; des march&#xe9;s.</div>';
+  }
+
+  return html;
+}
+
 function openModal(idx){
   var match=typeof idx==='number'?window._matchRefs[idx]:idx;if(!match)return;
   modalMatch=match;document.getElementById('moName').textContent=match.home+' vs '+match.away;
