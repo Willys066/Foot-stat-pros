@@ -522,7 +522,7 @@ tr:hover td{background:var(--s2)}
     <div class="r2" style="margin-bottom:10px">
       <div><div class="lsm">Date</div><input class="inp" id="tdDate" type="date"/></div>
       <div><div class="lsm">Mode</div>
-        <select class="inp" id="tdMode">
+        <select class="inp" id="tdMode" onchange="renderMatchsList()">
           <option value="all">Tous</option><option value="live">Live</option>
           <option value="soon">À venir</option><option value="done">Terminés</option>
         </select>
@@ -1229,6 +1229,197 @@ async function apiCall(endpoint,params){
 }
 
 // ═══════════════════════════════════ UI HELPERS ═══
+// ── openModal ──
+function openModal(idx){
+  var match=typeof idx==='number'?window._matchRefs[idx]:idx;if(!match)return;
+  modalMatch=match;document.getElementById('moName').textContent=match.home+' vs '+match.away;
+  document.getElementById('moH').textContent=match.home;document.getElementById('moA').textContent=match.away;
+  document.getElementById('moSH').value='';document.getElementById('moSA').value='';document.getElementById('modal').classList.add('on');
+}
+
+// ── closeModal ──
+function closeModal(e){if(e.target.id==='modal')document.getElementById('modal').classList.remove('on')}
+
+// ── saveResult ──
+function saveResult(){
+  var h=parseInt(document.getElementById('moSH').value,10),a=parseInt(document.getElementById('moSA').value,10);
+  if(isNaN(h)||isNaN(a)){alert('Entre les deux scores');return}
+  var r=getRes();r[modalMatch.id]={h:h,a:a};setRes(r);
+  if(modalMatch._pred){var track=getTrack();if(!track.find(function(t){return t.id===modalMatch.id})){track.push(buildTrackEntry({id:modalMatch.id,home:modalMatch.home,away:modalMatch.away,league:modalMatch.league||'?',country:modalMatch.country||'?'},modalMatch._pred,modalMatch._seuil||seuilTd,h,a));setTrack(track)}}
+  document.getElementById('modal').classList.remove('on');renderMatchsList();
+}
+
+// ── calcStats ──
+function calcStats(){
+  var db=getDB(),du=document.getElementById('stDu').value,au=document.getElementById('stAu').value;
+  var lf=document.getElementById('stLig').value.trim().toLowerCase(),s=seuilSt,tz=getTz();
+  var dates=Object.keys(db).filter(function(d){return(!du||d>=du)&&(!au||d<=au)}).sort();
+  if(!dates.length){showAl('stAl','er','Aucune donnée - Lance la collecte');return}
+  hideAl('stAl');document.getElementById('stLd').classList.add('on');document.getElementById('stOut').style.display='none';
+  setTimeout(function(){
+    var matchs=[];dates.forEach(function(d){var ms=(db[d]||[]).filter(function(m){return TERM.indexOf(m.status)>=0});if(lf)ms=ms.filter(function(m){return m.league.toLowerCase().indexOf(lf)>=0});matchs=matchs.concat(ms)});
+    var av=matchs.filter(function(m){return m.total!==null}),n=av.length;
+    if(!n){document.getElementById('stLd').classList.remove('on');showAl('stAl','er','Aucun match terminé avec score');return}
+    document.getElementById('stOut').innerHTML=buildStatsHTML(av,n,s,tz,dates.length,matchs);
+    document.getElementById('stLd').classList.remove('on');document.getElementById('stOut').style.display='block';
+  },50);
+}
+
+// ── buildComps ──
+function buildComps(){
+  var db=getDB(),s=seuilComp;
+  var all=Object.values(db).reduce(function(a,v){return a.concat(v)},[]);
+  var av=all.filter(function(m){return m.total!==null&&TERM.indexOf(m.status)>=0});
+  if(!av.length){showAl('compAl','er','Aucune donnée - Lance la collecte');return}
+  hideAl('compAl');
+  var lm={};
+  av.forEach(function(m){
+    var k=m.league+'|||'+m.country;
+    if(!lm[k])lm[k]={name:m.league,country:m.country,plus:0,v1:0,x:0,v2:0,bO:0,bN:0,dc1x:0,dcx2:0,dc12:0,csH:0,csA:0,hmsc:0,amsc:0,total:0,buts:0};
+    var e=lm[k];e.total++;e.buts+=m.total;
+    if(m.total>s)e.plus++;if(m.v1x2==='V1')e.v1++;if(m.v1x2==='X')e.x++;if(m.v1x2==='V2')e.v2++;
+    if(m.btts)e.bO++;else e.bN++;
+    if(m.v1x2==='V1'||m.v1x2==='X')e.dc1x++;if(m.v1x2==='X'||m.v1x2==='V2')e.dcx2++;if(m.v1x2==='V1'||m.v1x2==='V2')e.dc12++;
+    if(m.a===0)e.csH++;if(m.h===0)e.csA++;if(m.h>0)e.hmsc++;if(m.a>0)e.amsc++;
+  });
+  compData=Object.values(lm);
+  var totalM=av.length,totalPlus=av.filter(function(m){return m.total>s}).length;
+  document.getElementById('compSummary').innerHTML='<div class="sg g3"><div class="sb"><div class="sv" style="color:var(--p)">'+compData.length+'</div><div class="sl">Compét.</div></div><div class="sb"><div class="sv" style="color:var(--b)">'+totalM+'</div><div class="sl">Matchs</div></div><div class="sb"><div class="sv" style="color:var(--y)">'+Math.round(totalPlus/totalM*100)+'%</div><div class="sl">Taux +'+s+'</div></div></div>';
+  document.getElementById('compSummary').style.display='block';renderComps();
+}
+
+// ── renderTickets ──
+function renderTickets(tickets){
+  var out=document.getElementById('tkOut');out.innerHTML='';var savedTk=getTickets();
+  tickets.forEach(function(tk,idx){
+    var coteColor=tk.coteTotal>=5?'var(--r)':tk.coteTotal>=3?'var(--y)':'var(--g)';var cls=idx===0?'best':idx===1?'good':'';
+    var html='<div class="tk-card '+cls+'"><div class="tk-head"><div class="tk-title">Ticket '+(idx+1)+(idx===0?' ⭐':'')+'</div><div class="tk-cote" style="color:'+coteColor+'">×'+tk.coteTotal+'</div></div>';
+    tk.matchs.forEach(function(cand){
+      var pred=cand.pred,convCls='conv-'+pred.convergence,probP=Math.round(cand.pari.prob*100);
+      html+='<div class="tk-row"><div class="tk-match-name">'+cand.m.home+' vs '+cand.m.away+'</div><div class="tk-pred-row"><span style="font-size:.62rem;color:var(--dm);font-family:var(--mono)">'+cand.m.league+'</span><div style="display:flex;gap:4px;align-items:center"><span class="conv-star '+convCls+'">'+pred.convergence+'/'+pred.nbSig+' ⚡</span><span class="tk-p tk-pend">'+cand.pari.label+' '+probP+'%</span><span style="font-size:.66rem;color:var(--y);font-weight:700">×'+cand.pari.coteEst+'</span></div></div><div style="font-size:.58rem;color:var(--dm);margin-top:2px;font-family:var(--mono)">'+cand.m.heure+' · Conf. '+pred.conf+'% · '+pred.ligTotal+' hist.</div></div>';
+    });
+    var avgProb=Math.round(tk.matchs.reduce(function(s,c){return s+c.pari.prob},0)/tk.matchs.length*100);
+    var avgConv=Math.round(tk.matchs.reduce(function(s,c){return s+c.pred.convergence},0)/tk.matchs.length*10)/10;
+    html+='<div class="tk-result-row"><div class="tk-stat"><div class="v" style="color:var(--g)">'+avgProb+'%</div><div class="sl">Moy prob</div></div><div class="tk-stat"><div class="v" style="color:var(--b)">'+avgConv+'/3</div><div class="sl">Moy sig</div></div><div class="tk-stat"><div class="v" style="color:var(--y)">×'+tk.coteTotal+'</div><div class="sl">Cote tot</div></div></div>';
+    var saved=savedTk.find(function(s){return s.id===tk.id&&s.date===tk.date});
+    if(saved){var rc=saved.result==='won'?'var(--g)':'var(--r)';html+='<div style="margin-top:8px;padding:7px;background:rgba(0,0,0,.2);border-radius:7px;text-align:center;font-weight:900;color:'+rc+'">'+( saved.result==='won'?'GAGNÉ ✓':'PERDU ✗')+'</div>'}
+    else html+='<button class="bsm" onclick="openTkModal('+idx+')" style="width:100%;padding:7px;text-align:center;margin-top:8px">Marquer le résultat</button>';
+    html+='</div>';out.innerHTML+=html;
+  });
+  out.style.display='block';
+}
+
+// ── computeAndSaveCalib ──
+function computeAndSaveCalib(entries,s){
+  var mkts=getAllMarkets(s),newCalib={};
+  mkts.forEach(function(mkt){var st=mktAccuracy(entries,mkt);if(st.n>=10&&st.predAvg&&st.realRate){newCalib[mkt.id]=Math.min(1.3,Math.max(0.7,Math.round(st.realRate/st.predAvg*100)/100))}});
+  setCalib(newCalib);return newCalib;
+}
+
+// ── buildTrackEntry ──
+function buildTrackEntry(m,pred,s,h,a){
+  var tot=h+a;
+  return{id:m.id,date:today(),home:m.home,away:m.away,league:m.league||'?',country:m.country||'?',seuil:s,
+    rH:h,rA:a,rTotal:tot,rV1x2:h>a?'V1':h<a?'V2':'X',rBtts:h>0&&a>0,
+    rPlus:tot>s,rUnder:tot<=s,rCsH:a===0,rCsA:h===0,rHmsc:h>0,rAmsc:a>0,
+    rDc1x:h>=a,rDcx2:a>=h,rDc12:h!==a,
+    pPlus:pred.plus!==null?Math.round(pred.plus*100):null,pUnder:pred.under!==null?Math.round(pred.under*100):null,
+    pV1:pred.v1!==null?Math.round(pred.v1*100):null,pX:pred.x!==null?Math.round(pred.x*100):null,pV2:pred.v2!==null?Math.round(pred.v2*100):null,
+    pBtts:pred.btts!==null?Math.round(pred.btts*100):null,pBttsNon:pred.bttsNon!==null?Math.round(pred.bttsNon*100):null,
+    pCsH:pred.csH!==null?Math.round(pred.csH*100):null,pCsA:pred.csA!==null?Math.round(pred.csA*100):null,
+    pHmsc:pred.hmsc!==null?Math.round(pred.hmsc*100):null,pAmsc:pred.amsc!==null?Math.round(pred.amsc*100):null,
+    pDc1x:pred.dc1x!==null?Math.round(pred.dc1x*100):null,pDcx2:pred.dcx2!==null?Math.round(pred.dcx2*100):null,pDc12:pred.dc12!==null?Math.round(pred.dc12*100):null,
+    pConf:pred.conf||0,pConv:pred.convergence||0,pNbSig:pred.nbSig||0,auto:true};
+}
+
+// ── setFiabView ──
+function setFiabView(v){
+  fiabView=v;
+  document.querySelectorAll('.fiab-tab').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)});
+  renderFiabOut();
+}
+
+// ── renderAnHist ──
+async function renderAnHist(){
+  var list=document.getElementById('anHistList'),empty=document.getElementById('anHistEmpty'),statsBar=document.getElementById('anHistStatsBar');
+  var matches=await getAllAnalyses();
+  if(!matches.length){list.innerHTML='';empty.style.display='block';statsBar.style.display='none';renderDash();return}
+  empty.style.display='none';
+  var withResult=matches.filter(function(m){return m.result&&m.result.correct!==undefined});
+  var correct=withResult.filter(function(m){return m.result.correct});
+  var yesPred=matches.filter(function(m){return m.verdict&&m.verdict.includes('OUI')});
+  var noPred=matches.filter(function(m){return m.verdict&&m.verdict.includes('NON')});
+  document.getElementById('ahTotal').textContent=matches.length;
+  document.getElementById('ahAcc').textContent=withResult.length?Math.round(correct.length/withResult.length*100)+'%':'—';
+  document.getElementById('ahYes').textContent=yesPred.length;
+  document.getElementById('ahNo').textContent=noPred.length;
+  statsBar.style.display='block';
+  list.innerHTML=matches.map(function(m){
+    var c=m.vClass==='verdict-yes'?'var(--g)':m.vClass==='verdict-no'?'var(--r)':'var(--y)';
+    var bg=m.vClass==='verdict-yes'?'rgba(0,229,160,.1)':m.vClass==='verdict-no'?'rgba(255,61,90,.1)':'rgba(255,199,44,.1)';
+    var resultHTML;
+    if(m.result&&m.result.correct!==undefined){
+      var rc=m.result.correct;
+      resultHTML='<span class="'+(rc?'result-correct':'result-wrong')+'">'+(rc?'✅':'❌')+' '+m.result.hg+'-'+m.result.ag+' — BTTS '+(m.result.bttsReal?'OUI':'NON')+' réel</span>';
+    } else {
+      resultHTML='<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap"><span style="font-size:.64rem;color:var(--dm)">Résultat:</span><input class="score-mini" id="hg-'+m.id+'" type="number" min="0" max="20" placeholder="0"><span style="color:var(--dm)">-</span><input class="score-mini" id="ag-'+m.id+'" type="number" min="0" max="20" placeholder="0"><button class="save-result-btn" onclick="saveAnResult('+m.id+')">💾 Sauver</button></div>';
+    }
+    var aiHTML='';
+    if(m.result&&m.result.correct!==undefined){
+      if(m.aiAnalysis){
+        var ai=m.aiAnalysis;
+        aiHTML='<div class="ai-block"><div class="ai-block-header"><span>🤖</span><span class="ai-title">Analyse IA</span></div><strong style="color:'+(m.result.correct?'var(--g)':'var(--r)')+'">'+ai.verdict+'</strong> — '+ai.raison+(ai.conseil?'<br><strong>Conseil:</strong> '+ai.conseil:'')+'</div>';
+      } else {
+        aiHTML='<div class="ai-block"><div class="ai-block-header"><span>🤖</span><span class="ai-title">Analyse IA</span><button class="ai-btn" onclick="rerunAnAI('+m.id+')">▶ Analyser</button></div><span style="color:var(--dm);font-size:.66rem">'+(cfg.groqKey?'Clique ▶ pour lancer.':'Clé Groq requise dans Config.')+'</span></div>';
+      }
+    }
+    return '<div class="hi-item" id="hai-'+m.id+'"><div class="hi-top"><div class="hi-match">'+m.home+' <span style="color:var(--dm)">vs</span> '+m.away+'</div><div class="hi-score" style="color:'+c+'">'+m.scorePure+'%</div><div class="hi-verdict" style="color:'+c+';background:'+bg+';border:1px solid '+c+'">'+m.verdict+'</div>'+(m.chaosPct!==undefined?'<div style="font-size:.6rem;color:var(--dm)">🎲'+m.chaosPct+'%</div>':'')+'<div class="hi-date">'+m.date+'</div><button class="delete-btn" onclick="deleteAnItem('+m.id+')" title="Supprimer">🗑️</button></div><div class="hi-bottom">'+resultHTML+'</div>'+aiHTML+'</div>';
+  }).join('');
+  renderDash();
+}
+
+// ── genTickets ──
+async function genTickets(){
+  if(!cfg.apiKey){showAl('tkAl','er','Entre ta clé dans Config');return}
+  var date=document.getElementById('tkDate').value;if(!date){showAl('tkAl','er','Sélectionne une date');return}
+  var coteMin=parseFloat(document.getElementById('tkCoteMin').value)||2,coteMax=parseFloat(document.getElementById('tkCoteMax').value)||10;
+  var nbTickets=parseInt(document.getElementById('tkNb').value)||4,tkType=document.getElementById('tkType').value;
+  hideAl('tkAl');document.getElementById('tkLd').classList.add('on');document.getElementById('tkOut').style.display='none';document.getElementById('tkCotesSection').style.display='none';
+  var tz=getTz(),cache=buildCache(),fx=[],db=getDB();
+  if(db[date]&&db[date].length>0){fx=db[date].filter(function(f){return TERM.indexOf(f.status)<0})}
+  else{var data=await apiCall('/fixtures',{date:date});if(!data){document.getElementById('tkLd').classList.remove('on');showAl('tkAl','er','Erreur API');return}fx=data.response.map(function(f){return parseFix(f,tz)}).filter(function(f){return TERM.indexOf(f.status)<0})}
+  document.getElementById('tkLd').classList.remove('on');
+  if(!fx.length){showAl('tkAl','in','Aucun match à venir pour cette date.');return}
+  var candidates=[];
+  fx.forEach(function(m){
+    var pred=cache.total>0?predict(m,cache,seuilTk,null):null;if(!pred)return;if(pred.convergence<convTkVal)return;
+    var pari=selectPari(pred,tkType);if(!pari||pari.prob<0.45)return;
+    var convBoost=pred.nbSig>0?1+pred.convergence/pred.nbSig*0.3:1,confBoost=1+pred.conf/200;
+    candidates.push({m:m,pred:pred,pari:pari,score:pari.prob*convBoost*confBoost});
+  });
+  if(candidates.length<2){showAl('tkAl','er','Pas assez de matchs éligibles ('+candidates.length+'). Baisse la convergence ou collecte plus.');return}
+  candidates.sort(function(a,b){return b.score-a.score});
+  var tickets=[],pool=candidates.slice(0,Math.min(candidates.length,12));
+  for(var t=0;t<nbTickets;t++){
+    var tkMatchs=[],coteCumul=1.0,shuffled=pool.slice().sort(function(){return Math.random()-0.5});
+    for(var i=0;i<shuffled.length&&tkMatchs.length<5;i++){
+      var cand=shuffled[i];if(tkMatchs.find(function(x){return x.m.id===cand.m.id}))continue;
+      var newCote=coteCumul*cand.pari.coteEst;if(newCote<=coteMax){tkMatchs.push(cand);coteCumul=newCote}
+      if(coteCumul>=coteMin&&tkMatchs.length>=3)break;
+    }
+    if(tkMatchs.length>=2)tickets.push({id:t+1,matchs:tkMatchs,coteTotal:Math.round(coteCumul*100)/100,date:date,result:null});
+  }
+  if(!tickets.length){showAl('tkAl','er','Impossible de construire des tickets dans cette plage de cotes.');return}
+  currentTickets=tickets;renderTickets(tickets);buildCotesForm(tickets);
+}
+
+// ── buildCotesForm ──
+function buildCotesForm(tickets){
+  var seen={},allM=[];tickets.forEach(function(tk){tk.matchs.forEach(function(c){if(!seen[c.m.id]){seen[c.m.id]=true;allM.push(c)}})});
+  var html='';allM.forEach(function(c){html+='<div style="margin-bottom:8px"><div class="lsm">'+c.m.home+' vs '+c.m.away+' ('+c.pari.label+')</div><input class="inp" type="number" id="cote_'+c.m.id+'" placeholder="Cote (ex: 1.75)" step="0.01" min="1.01" value=""/></div>'});
+  document.getElementById('tkCotesForm').innerHTML=html;document.getElementById('tkCotesSection').style.display='block';
+}
+
 function goTab(i){
   document.querySelectorAll('.tab').forEach(function(t,j){t.classList.toggle('on',i===j)});
   // Cible tous les panels par id p0..p7
@@ -2338,19 +2529,15 @@ async function loadMatchs(source){
     if(fx.length>0){var db2=getDB();db2[date]=fx;setDB(db2);majDB()}
     showAl('tdAl','ok',fx.length+' matchs chargés et sauvegardés.');
   }
-  var mode=document.getElementById('tdMode').value,fxF;
-  if(mode==='soon')fxF=fx.filter(function(f){return TERM.indexOf(f.status)<0&&LIVE.indexOf(f.status)<0});
-  else if(mode==='done')fxF=fx.filter(function(f){return TERM.indexOf(f.status)>=0});
-  else if(mode==='live')fxF=fx.filter(function(f){return LIVE.indexOf(f.status)>=0});
-  else fxF=fx.slice();
-  var liveCtx=buildLiveContext(fxF,seuilTd);
-  // Toujours tenter predict même si cache faible - afficher matchs dans tous les cas
-  fxF.forEach(function(m){
+  // Stocker TOUS les matchs - le filtre mode s'applique dans renderMatchsList
+  var liveCtx=buildLiveContext(fx,seuilTd);
+  fx.forEach(function(m){
     try{m._pred=cache.total>0?predict(m,cache,seuilTd,liveCtx):null;}
     catch(e){m._pred=null;}
   });
-  fxF.sort(function(a,b){var ca=a._pred?a._pred.convergence:-1,cb=b._pred?b._pred.convergence:-1;if(cb!==ca)return cb-ca;return(a.heure||'').localeCompare(b.heure||'')});
-  allMatchsCache=fxF;
+  fx.sort(function(a,b){var ca=a._pred?a._pred.convergence:-1,cb=b._pred?b._pred.convergence:-1;if(cb!==ca)return cb-ca;return(a.heure||'').localeCompare(b.heure||'')});
+  allMatchsCache=fx; // TOUS les matchs sans filtre mode
+  window._predCache=cache;
   document.getElementById('tTot').textContent=fx.length;
   document.getElementById('tLiv').textContent=fx.filter(function(f){return LIVE.indexOf(f.status)>=0}).length;
   document.getElementById('tSoo').textContent=fx.filter(function(f){return TERM.indexOf(f.status)<0&&LIVE.indexOf(f.status)<0}).length;
@@ -2364,7 +2551,15 @@ function toggleAllGroups(open){
 }
 function renderMatchsList(){
   window._matchRefs=[];var list=document.getElementById('tdList');list.innerHTML='';
-  var fx=allMatchsCache.filter(function(m){if(convFilterVal===0)return true;return(m._pred?m._pred.convergence:0)>=convFilterVal});
+  // Appliquer filtre mode sur tous les matchs en cache
+  var mode=document.getElementById('tdMode')?document.getElementById('tdMode').value:'all';
+  var modeFiltered;
+  if(mode==='soon') modeFiltered=allMatchsCache.filter(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
+  else if(mode==='done') modeFiltered=allMatchsCache.filter(function(m){return TERM.indexOf(m.status)>=0});
+  else if(mode==='live') modeFiltered=allMatchsCache.filter(function(m){return LIVE.indexOf(m.status)>=0});
+  else modeFiltered=allMatchsCache.slice();
+  // Puis filtre convergence
+  var fx=modeFiltered.filter(function(m){if(convFilterVal===0)return true;return(m._pred?m._pred.convergence:0)>=convFilterVal});
   if(!fx.length){list.innerHTML='<div style="text-align:center;color:var(--dm);padding:30px;font-size:.8rem">Aucun match. Baisse la convergence minimum.</div>';return}
   var results=getRes(),track=getTrack();
   fx.forEach(function(m){if(TERM.indexOf(m.status)>=0&&m.h!==null&&m.a!==null&&m._pred&&!track.find(function(t){return t.id===m.id})){track.push(buildTrackEntry(m,m._pred,seuilTd,m.h,m.a));setTrack(track)}});
