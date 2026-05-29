@@ -430,6 +430,7 @@ tr:hover td{background:var(--s2)}
   <button class="tab" onclick="goTab(5)">Compet.</button>
   <button class="tab" onclick="goTab(6)">Tickets</button>
   <button class="tab" onclick="goTab(7)">Fiab.</button>
+  <button class="tab" onclick="goTab(8)">Cotes</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ CONFIG ══ -->
@@ -995,6 +996,45 @@ tr:hover td{background:var(--s2)}
     </div>
   </div>
   <div id="tkOut" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ ODDS ══ -->
+<div class="panel" id="p8">
+  <div class="card">
+    <span class="clbl">Collecte des cotes</span>
+    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">R&#xe9;cup&#xe8;re les cotes bookmakers via API pour tous les march&#xe9;s disponibles.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div><div class="lsm">Du</div><input class="inp" id="oddsDu" type="date"/></div>
+      <div><div class="lsm">Au</div><input class="inp" id="oddsAu" type="date"/></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div class="lsm">Bookmaker</div>
+      <select class="inp" id="oddsBk">
+        <option value="1">Bet365</option>
+        <option value="6">Bwin</option>
+        <option value="8">Unibet</option>
+        <option value="16">Betway</option>
+        <option value="11">1xBet</option>
+        <option value="3">Pinnacle</option>
+      </select>
+    </div>
+    <button class="btn bb" onclick="collectOdds()" style="margin-bottom:7px">&#x1F4E1; Collecter les cotes</button>
+    <button class="bsm" onclick="calcOddsStats()" style="width:100%;padding:9px;text-align:center;color:var(--g)">&#x1F4CA; Analyser les stats cotes</button>
+  </div>
+  <div class="ld" id="oddsLd"><div class="sp"></div><p>Collecte des cotes...</p></div>
+  <div class="al" id="oddsAl"></div>
+
+  <!-- Résumé collecte -->
+  <div id="oddsSummary" style="display:none;margin-bottom:8px">
+    <div class="sg g3">
+      <div class="sb"><div class="sv" id="oddsTotM" style="color:var(--b)">0</div><div class="sl">Matchs</div></div>
+      <div class="sb"><div class="sv" id="oddsTotO" style="color:var(--g)">0</div><div class="sl">Cotes</div></div>
+      <div class="sb"><div class="sv" id="oddsLastUp" style="color:var(--y);font-size:.7rem">—</div><div class="sl">Derni&#xe8;re MAJ</div></div>
+    </div>
+  </div>
+
+  <!-- Stats cotes output -->
+  <div id="oddsOut" style="display:none"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ FIABILITE ══ -->
@@ -1623,12 +1663,13 @@ function toggleComp(head){head.parentElement.querySelector('.comp-body').classLi
 function goTab(i){
   document.querySelectorAll('.tab').forEach(function(t,j){t.classList.toggle('on',i===j)});
   // Cible tous les panels par id p0..p7
-  for(var k=0;k<=7;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
+  for(var k=0;k<=8;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
   if(i===1)majDB();
   if(i===4)initStDates();
   if(i===3){renderAnHist();renderDash();initMultiTab()}
   if(i===6)document.getElementById('tkDate').value=today();
   if(i===7)initSyncDates();
+  if(i===8)initOddsDates();
 }
 function showAl(id,t,msg){var e=document.getElementById(id);e.className='al on a'+t;e.innerHTML=msg}
 function hideAl(id){document.getElementById(id).className='al'}
@@ -3076,6 +3117,318 @@ function buildScenario(match,pred,s){
   }
 
   return html;
+}
+
+
+// ═══════════════════════════════════ ODDS ENGINE ═══
+var ODDS_KEY='fs_odds_v1';
+
+function getOddsDB(){try{return JSON.parse(localStorage.getItem(ODDS_KEY)||'{}')}catch(e){return{}}}
+function setOddsDB(d){localStorage.setItem(ODDS_KEY,JSON.stringify(d))}
+
+function initOddsDates(){
+  var db=getDB(),dates=Object.keys(db).sort();
+  var du=document.getElementById('oddsDu'),au=document.getElementById('oddsAu');
+  if(!du||!au)return;
+  if(dates.length){if(!du.value)du.value=dates[0];if(!au.value)au.value=dates[dates.length-1];}
+  else{if(!du.value)du.value=nAgo(7);if(!au.value)au.value=today();}
+  updateOddsSummary();
+}
+
+function updateOddsSummary(){
+  var odb=getOddsDB();
+  var mIds=Object.keys(odb),totO=0;
+  mIds.forEach(function(id){totO+=Object.keys(odb[id].markets||{}).length;});
+  document.getElementById('oddsTotM').textContent=mIds.length;
+  document.getElementById('oddsTotO').textContent=totO;
+  document.getElementById('oddsLastUp').textContent=mIds.length?new Date().toLocaleDateString('fr'):'—';
+  document.getElementById('oddsSummary').style.display=mIds.length?'block':'none';
+}
+
+async function collectOdds(){
+  if(!cfg.apiKey){showAl('oddsAl','er','Cl\u00e9 API manquante — configure-la dans l\'onglet Config');return}
+  var du=document.getElementById('oddsDu').value;
+  var au=document.getElementById('oddsAu').value;
+  var bk=document.getElementById('oddsBk').value;
+  if(!du||!au){showAl('oddsAl','er','S\u00e9lectionne une plage de dates');return}
+  var dates=getDates(du,au);
+  if(dates.length>7){showAl('oddsAl','er','Maximum 7 jours par collecte (limite API)');return}
+  hideAl('oddsAl');
+  document.getElementById('oddsLd').classList.add('on');
+  document.getElementById('oddsOut').style.display='none';
+  var odb=getOddsDB();
+  var db=getDB();
+  var totalFetched=0,totalMissed=0;
+
+  for(var di=0;di<dates.length;di++){
+    var d=dates[di];
+    var dayFixtures=db[d]||[];
+    if(!dayFixtures.length)continue;
+    // Batch: get all fixture IDs for this day
+    var ids=dayFixtures.map(function(m){return m.id}).filter(function(id){return id&&id>0});
+    // API-Football: /odds?date=YYYY-MM-DD&bookmaker=X
+    var data=await apiCall('/odds',{date:d,bookmaker:bk,season:new Date(d).getFullYear()});
+    if(!data||!data.response){totalMissed+=ids.length;continue;}
+    data.response.forEach(function(entry){
+      var fid=entry.fixture&&entry.fixture.id?entry.fixture.id:0;
+      if(!fid)return;
+      var markets={};
+      (entry.bookmakers||[]).forEach(function(bkEntry){
+        (bkEntry.bets||[]).forEach(function(bet){
+          var mktName=bet.name;
+          var vals={};
+          (bet.values||[]).forEach(function(v){vals[v.value]=parseFloat(v.odd)||null;});
+          markets[mktName]=vals;
+        });
+      });
+      if(Object.keys(markets).length){
+        odb[fid]={date:d,fixtureId:fid,markets:markets,bk:parseInt(bk),fetchedAt:Date.now()};
+        totalFetched++;
+      }
+    });
+  }
+  setOddsDB(odb);
+  document.getElementById('oddsLd').classList.remove('on');
+  updateOddsSummary();
+  if(totalFetched>0){
+    showAl('oddsAl','ok',totalFetched+' matchs avec cotes collect\u00e9s');
+  } else {
+    showAl('oddsAl','er','Aucune cote trouv\u00e9e — v\u00e9rifie que ta cl\u00e9 API inclut l\'acc\u00e8s aux odds');
+  }
+}
+
+// Convertit cote en probabilité implicite (avec marge)
+function cote2prob(cote){return cote>1?1/cote:null;}
+
+// Calcule la marge du bookmaker pour un groupe de cotes 1X2
+function calcMarge(c1,cx,c2){
+  if(!c1||!cx||!c2)return null;
+  return Math.round((1/c1+1/cx+1/c2-1)*100*10)/10;
+}
+
+// Value bet : diff entre proba prédite et proba implicite
+function valueEdge(predProb,cote){
+  if(!predProb||!cote||cote<=1)return null;
+  var impliedProb=1/cote;
+  return Math.round((predProb-impliedProb)*100*10)/10; // en %
+}
+
+function calcOddsStats(){
+  var odb=getOddsDB();
+  var mIds=Object.keys(odb);
+  if(!mIds.length){showAl('oddsAl','er','Aucune cote en base — Lance d\'abord la collecte');return}
+  var db=getDB();
+  var cache=buildCache();
+  var tz=getTz();
+  // Construire liste matchs avec cotes + résultat + prédiction
+  var enriched=[];
+  mIds.forEach(function(fid){
+    var entry=odb[fid];
+    var dayMs=(db[entry.date]||[]);
+    var match=dayMs.find(function(m){return String(m.id)===String(fid)});
+    if(!match)return;
+    var pred=cache.total>0?predict(match,cache,seuilTd,null):null;
+    var terminated=TERM.indexOf(match.status)>=0;
+    var mkts=entry.markets;
+    // Extraire cotes clés
+    var c1=null,cx=null,c2=null,covPlus=null,covUnder=null,cBttsY=null,cBttsN=null;
+    // 1X2
+    var m1x2=mkts['Match Winner']||mkts['1X2']||mkts['Home/Away']||null;
+    if(m1x2){c1=m1x2['Home']||m1x2['1']||null;cx=m1x2['Draw']||m1x2['X']||null;c2=m1x2['Away']||m1x2['2']||null;}
+    // Over/Under 2.5
+    var mOU=mkts['Goals Over/Under']||mkts['Over/Under']||null;
+    if(mOU){
+      Object.keys(mOU).forEach(function(k){
+        if(k.indexOf('Over 2.5')>=0||k==='Over 2.5')covPlus=mOU[k];
+        if(k.indexOf('Under 2.5')>=0||k==='Under 2.5')covUnder=mOU[k];
+      });
+    }
+    // BTTS
+    var mBtts=mkts['Both Teams Score']||mkts['BTTS']||null;
+    if(mBtts){cBttsY=mBtts['Yes']||null;cBttsN=mBtts['No']||null;}
+
+    enriched.push({
+      match:match,pred:pred,terminated:terminated,date:entry.date,
+      c1:c1,cx:cx,c2:c2,
+      covPlus:covPlus,covUnder:covUnder,
+      cBttsY:cBttsY,cBttsN:cBttsN,
+      marge:calcMarge(c1,cx,c2),
+      mkts:mkts
+    });
+  });
+
+  if(!enriched.length){showAl('oddsAl','er','Impossible de croiser les cotes avec les matchs en base');return}
+  hideAl('oddsAl');
+  renderOddsStats(enriched);
+}
+
+function renderOddsStats(data){
+  var terminated=data.filter(function(d){return d.terminated&&d.match.h!==null;});
+  var withPred=data.filter(function(d){return d.pred;});
+  var html='';
+
+  // ── Résumé ──
+  html+='<div class="card">';
+  html+='<div class="sg g3" style="margin-bottom:10px">';
+  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+data.length+'</div><div class="sl">Matchs</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+terminated.length+'</div><div class="sl">Termin\u00e9s</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--y)">'+withPred.length+'</div><div class="sl">Avec pred.</div></div>';
+  html+='</div>';
+
+  // Marge moyenne bookie
+  var marges=data.filter(function(d){return d.marge!==null;}).map(function(d){return d.marge;});
+  if(marges.length){
+    var avgMarge=Math.round(marges.reduce(function(a,b){return a+b},0)/marges.length*10)/10;
+    html+='<div style="font-size:.72rem;color:var(--dm);font-family:var(--mono)">Marge bookmaker moyenne : <span style="color:var(--r);font-weight:700">'+avgMarge+'%</span></div>';
+  }
+  html+='</div>';
+
+  // ── Value Bets ──
+  if(withPred.length){
+    html+='<div class="st" style="margin:12px 0 8px">&#x1F4B0; Value Bets d\u00e9tect\u00e9es</div>';
+    html+='<div class="card">';
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Edge positif = FootStats pr\u00e9dit plus que le bookmaker. Seuil : edge &gt;5%</div>';
+    var valueBets=[];
+    withPred.forEach(function(d){
+      var p=d.pred;
+      if(!p)return;
+      var checks=[
+        {label:'1 ('+d.match.home+')',cote:d.c1,prob:p.v1,mkt:'1X2'},
+        {label:'X',cote:d.cx,prob:p.x,mkt:'1X2'},
+        {label:'2 ('+d.match.away+')',cote:d.c2,prob:p.v2,mkt:'1X2'},
+        {label:'Over 2.5',cote:d.covPlus,prob:p.plus,mkt:'OU'},
+        {label:'Under 2.5',cote:d.covUnder,prob:p.under,mkt:'OU'},
+        {label:'BTTS Oui',cote:d.cBttsY,prob:p.btts,mkt:'BTTS'},
+        {label:'BTTS Non',cote:d.cBttsN,prob:p.bttsNon,mkt:'BTTS'},
+      ];
+      checks.forEach(function(c){
+        var edge=valueEdge(c.prob,c.cote);
+        if(edge===null)return;
+        if(edge>=5){
+          var won=null;
+          if(d.terminated){
+            if(c.mkt==='1X2'&&c.label.indexOf('1 (')===0)won=d.match.v1x2==='V1';
+            else if(c.mkt==='1X2'&&c.label==='X')won=d.match.v1x2==='X';
+            else if(c.mkt==='1X2'&&c.label.indexOf('2 (')===0)won=d.match.v1x2==='V2';
+            else if(c.label==='Over 2.5')won=d.match.total>2.5;
+            else if(c.label==='Under 2.5')won=d.match.total<=2.5;
+            else if(c.label==='BTTS Oui')won=d.match.btts;
+            else if(c.label==='BTTS Non')won=!d.match.btts;
+          }
+          valueBets.push({match:d.match.home+' vs '+d.match.away,date:d.date,
+                          label:c.label,cote:c.cote,predProb:Math.round((c.prob||0)*100),
+                          edge:edge,won:won});
+        }
+      });
+    });
+    valueBets.sort(function(a,b){return b.edge-a.edge});
+    if(valueBets.length){
+      html+='<div class="tbl"><table><thead><tr><th>Match</th><th>Pari</th><th>Cote</th><th>Pred%</th><th>Edge</th><th>R\u00e9sultat</th></tr></thead><tbody>';
+      valueBets.slice(0,20).forEach(function(v){
+        var resCol=v.won===null?'':v.won?'tg':'tr';
+        var resTxt=v.won===null?'—':v.won?'✅':'❌';
+        html+='<tr><td style="font-size:.58rem">'+v.match.substring(0,20)+'<br><span style="color:var(--dm)">'+v.date+'</span></td>';
+        html+='<td>'+v.label+'</td><td style="color:var(--y);font-weight:700">'+v.cote+'</td>';
+        html+='<td>'+v.predProb+'%</td><td class="tg">+'+v.edge+'%</td><td class="'+resCol+'">'+resTxt+'</td></tr>';
+      });
+      html+='</tbody></table></div>';
+      // ROI value bets
+      var vbTerminated=valueBets.filter(function(v){return v.won!==null});
+      if(vbTerminated.length){
+        var wins=vbTerminated.filter(function(v){return v.won}).length;
+        var roi=vbTerminated.reduce(function(acc,v){return acc+(v.won?(v.cote-1):-1)},0);
+        var roiPct=Math.round(roi/vbTerminated.length*100);
+        html+='<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:7px;font-size:.68rem;font-family:var(--mono)">';
+        html+='Sur '+vbTerminated.length+' value bets termin\u00e9es : '+wins+' gagn\u00e9es · ROI : <span style="color:'+(roiPct>=0?'var(--g)':'var(--r)')+'">'+( roiPct>=0?'+':'')+roiPct+'%</span></div>';
+      }
+    } else {
+      html+='<div style="font-size:.68rem;color:var(--dm);font-family:var(--mono)">Aucune value bet avec edge &gt;5% d\u00e9tect\u00e9e.</div>';
+    }
+    html+='</div>';
+  }
+
+  // ── ROI par tranche de cote ──
+  if(terminated.length>=5){
+    html+='<div class="st" style="margin:12px 0 8px">&#x1F4C8; ROI par tranche de cote</div>';
+    html+='<div class="card">';
+    var tranches=[
+      {min:1.01,max:1.40,label:'1.01–1.40'},
+      {min:1.40,max:1.70,label:'1.40–1.70'},
+      {min:1.70,max:2.10,label:'1.70–2.10'},
+      {min:2.10,max:2.80,label:'2.10–2.80'},
+      {min:2.80,max:4.00,label:'2.80–4.00'},
+      {min:4.00,max:99,label:'4.00+'},
+    ];
+    // Collecter tous les paris terminés avec cote + résultat
+    var allBets=[];
+    terminated.forEach(function(d){
+      var checks=[
+        {cote:d.c1,won:d.match.v1x2==='V1'},
+        {cote:d.cx,won:d.match.v1x2==='X'},
+        {cote:d.c2,won:d.match.v1x2==='V2'},
+        {cote:d.covPlus,won:d.match.total>2.5},
+        {cote:d.covUnder,won:d.match.total<=2.5},
+        {cote:d.cBttsY,won:d.match.btts===true},
+        {cote:d.cBttsN,won:d.match.btts===false},
+      ];
+      checks.forEach(function(c){if(c.cote&&c.cote>1)allBets.push(c);});
+    });
+    html+='<div class="tbl"><table><thead><tr><th>Tranche</th><th>Paris</th><th>Gagnants</th><th>Taux r\u00e9el</th><th>Taux impl.</th><th>ROI</th></tr></thead><tbody>';
+    tranches.forEach(function(tr){
+      var bets=allBets.filter(function(b){return b.cote>=tr.min&&b.cote<tr.max;});
+      if(!bets.length)return;
+      var wins=bets.filter(function(b){return b.won;}).length;
+      var realRate=Math.round(wins/bets.length*100);
+      var avgCote=Math.round(bets.reduce(function(a,b){return a+b.cote;},0)/bets.length*100)/100;
+      var impliedRate=Math.round(100/avgCote);
+      var roi=Math.round((bets.reduce(function(acc,b){return acc+(b.won?(b.cote-1):-1);},0)/bets.length)*100);
+      var roiCol=roi>=0?'tg':'tr';
+      var diffRate=realRate-impliedRate;
+      var diffCol=diffRate>3?'tg':diffRate<-3?'tr':'';
+      html+='<tr><td>'+tr.label+'</td><td>'+bets.length+'</td><td>'+wins+'</td>';
+      html+='<td class="'+diffCol+'">'+realRate+'%</td><td>'+impliedRate+'%</td>';
+      html+='<td class="'+roiCol+'">'+(roi>=0?'+':'')+roi+'%</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    html+='<div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:6px;line-height:1.5">Taux impl. = ce que la cote moyenne implique · Taux r\u00e9el = ce qui s\'est pass\u00e9 · ROI = retour sur mise</div>';
+    html+='</div>';
+  }
+
+  // ── Taux de réalisation par cote ──
+  if(terminated.length>=5){
+    html+='<div class="st" style="margin:12px 0 8px">&#x1F3AF; Calibration bookmaker</div>';
+    html+='<div class="card">';
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Comparaison probabilit\u00e9 implicite bookmaker vs taux de r\u00e9alisation r\u00e9el. Un \u00e9cart persistant = edge exploitable.</div>';
+    var brackets=[10,20,30,40,50,60,70,80,90];
+    var buckMap={};
+    brackets.forEach(function(b){buckMap[b]={total:0,won:0};});
+    terminated.forEach(function(d){
+      var checks=[
+        {cote:d.c1,won:d.match.v1x2==='V1'},
+        {cote:d.cx,won:d.match.v1x2==='X'},
+        {cote:d.c2,won:d.match.v1x2==='V2'},
+      ];
+      checks.forEach(function(c){
+        if(!c.cote||c.cote<=1)return;
+        var implP=Math.round(100/c.cote/10)*10;
+        if(buckMap[implP]){buckMap[implP].total++;if(c.won)buckMap[implP].won++;}
+      });
+    });
+    html+='<div class="bars">';
+    brackets.forEach(function(b){
+      var bk=buckMap[b];if(!bk||bk.total<3)return;
+      var realP=Math.round(bk.won/bk.total*100);
+      var diff=realP-b;
+      var col=diff>5?'var(--g)':diff<-5?'var(--r)':'var(--y)';
+      html+='<div class="br2"><div class="bn" style="width:36px">~'+b+'%</div><div class="bb2">';
+      html+='<div class="bf" style="width:'+Math.min(100,realP)+'%;background:'+col+'">Réel: '+realP+'% ('+bk.won+'/'+bk.total+', '+(diff>0?'+':'')+diff+'%)</div>';
+      html+='</div></div>';
+    });
+    html+='</div></div>';
+  }
+
+  var out=document.getElementById('oddsOut');
+  out.innerHTML=html;out.style.display='block';
 }
 
 
