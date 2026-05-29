@@ -1012,24 +1012,75 @@ tr:hover td{background:var(--s2)}
     <div style="margin-bottom:10px">
       <div class="lsm">Championnat</div>
       <select class="inp" id="oddsSport">
-        <option value="soccer_france_ligue_one">Ligue 1 (France)</option>
-        <option value="soccer_england_league1">Premier League (Angleterre)</option>
-        <option value="soccer_spain_la_liga">La Liga (Espagne)</option>
-        <option value="soccer_germany_bundesliga">Bundesliga (Allemagne)</option>
-        <option value="soccer_italy_serie_a">Serie A (Italie)</option>
-        <option value="soccer_uefa_champs_league">Champions League</option>
-        <option value="soccer_uefa_europa_league">Europa League</option>
-        <option value="soccer_france_ligue_two">Ligue 2 (France)</option>
-        <option value="soccer_england_league2">Championship (Angleterre)</option>
-        <option value="soccer_netherlands_eredivisie">Eredivisie (Pays-Bas)</option>
-        <option value="soccer_portugal_primeira_liga">Primeira Liga (Portugal)</option>
-        <option value="soccer_turkey_super_league">Süper Lig (Turquie)</option>
+        <optgroup label="🏆 Coupes européennes">
+          <option value="soccer_uefa_champs_league">Champions League</option>
+          <option value="soccer_uefa_europa_league">Europa League</option>
+          <option value="soccer_uefa_europa_conference_league">Conference League</option>
+        </optgroup>
+        <optgroup label="🇫🇷 France">
+          <option value="soccer_france_ligue_one">Ligue 1</option>
+          <option value="soccer_france_ligue_two">Ligue 2</option>
+        </optgroup>
+        <optgroup label="🏴󠁧󠁢󠁥󠁮󠁧󠁿 Angleterre">
+          <option value="soccer_epl">Premier League</option>
+          <option value="soccer_england_league1">Championship</option>
+          <option value="soccer_england_league2">League One</option>
+        </optgroup>
+        <optgroup label="🇪🇸 Espagne">
+          <option value="soccer_spain_la_liga">La Liga</option>
+          <option value="soccer_spain_segunda_division">La Liga 2</option>
+        </optgroup>
+        <optgroup label="🇩🇪 Allemagne">
+          <option value="soccer_germany_bundesliga">Bundesliga</option>
+          <option value="soccer_germany_bundesliga2">2. Bundesliga</option>
+        </optgroup>
+        <optgroup label="🇮🇹 Italie">
+          <option value="soccer_italy_serie_a">Serie A</option>
+          <option value="soccer_italy_serie_b">Serie B</option>
+        </optgroup>
+        <optgroup label="🇳🇱 Pays-Bas / 🇵🇹 Portugal / 🇹🇷 Turquie">
+          <option value="soccer_netherlands_eredivisie">Eredivisie (Pays-Bas)</option>
+          <option value="soccer_portugal_primeira_liga">Primeira Liga (Portugal)</option>
+          <option value="soccer_turkey_super_league">Süper Lig (Turquie)</option>
+        </optgroup>
+        <optgroup label="🇧🇪 🇦🇹 🇨🇭 🇬🇷 🇷🇴 🇵🇱">
+          <option value="soccer_belgium_first_div">Jupiler Pro League (Belgique)</option>
+          <option value="soccer_austria_bundesliga">Bundesliga (Autriche)</option>
+          <option value="soccer_switzerland_superleague">Super League (Suisse)</option>
+          <option value="soccer_greece_super_league">Super League (Grèce)</option>
+          <option value="soccer_romania_1_liga">Liga I (Roumanie)</option>
+          <option value="soccer_poland_ekstraklasa">Ekstraklasa (Pologne)</option>
+        </optgroup>
+        <optgroup label="🏴󠁧󠁢󠁳󠁣󠁴󠁿 🇷🇺 🇩🇰 🇸🇪 🇳🇴">
+          <option value="soccer_scotland_premiership">Scottish Premiership</option>
+          <option value="soccer_russia_premier_league">Premier League (Russie)</option>
+          <option value="soccer_denmark_superliga">Superliga (Danemark)</option>
+          <option value="soccer_sweden_allsvenskan">Allsvenskan (Suède)</option>
+          <option value="soccer_norway_eliteserien">Eliteserien (Norvège)</option>
+        </optgroup>
+        <optgroup label="🌎 Amériques">
+          <option value="soccer_usa_mls">MLS (USA)</option>
+          <option value="soccer_mexico_ligamx">Liga MX (Mexique)</option>
+          <option value="soccer_brazil_campeonato">Brasileirão Serie A</option>
+          <option value="soccer_argentina_primera_division">Primera División (Argentine)</option>
+          <option value="soccer_conmebol_copa_libertadores">Copa Libertadores</option>
+        </optgroup>
+        <optgroup label="🌏 Asie / Océanie">
+          <option value="soccer_japan_j_league">J1 League (Japon)</option>
+          <option value="soccer_korea_kleague1">K League 1 (Corée)</option>
+          <option value="soccer_australia_aleague">A-League (Australie)</option>
+          <option value="soccer_china_superleague">Super League (Chine)</option>
+        </optgroup>
+        <optgroup label="🌍 Afrique / Autres">
+          <option value="soccer_south_africa_premier_division">Premier Division (Afrique du Sud)</option>
+        </optgroup>
       </select>
     </div>
     <div style="margin-bottom:10px">
       <div class="lsm">Marché</div>
       <select class="inp" id="oddsMkt">
         <option value="h2h">1X2 (Match Winner)</option>
+        <option value="doublechance">Double Chance (1X / 12 / X2)</option>
         <option value="totals">Over/Under buts</option>
         <option value="btts">BTTS (Les deux marquent)</option>
       </select>
@@ -3247,6 +3298,12 @@ function normalizeOddsApiResponse(events,mktType){
           'Yes':vals['Yes']||null,
           'No':vals['No']||null
         };
+      } else if(mktName==='doublechance'){
+        markets['Double Chance']={
+          '1X':vals['Home/Draw']||null,
+          '12':vals['Home/Away']||null,
+          'X2':vals['Draw/Away']||null
+        };
       }
     });
     if(Object.keys(markets).length){
@@ -3264,6 +3321,75 @@ function normalizeOddsApiResponse(events,mktType){
   });
   setOddsDB(odb);
   return fetched;
+}
+
+// ── Render collected odds as match cards ──
+function renderCollectedOdds(events, mktSel){
+  var out=document.getElementById('oddsOut');
+  if(!events||!events.length){out.style.display='none';return;}
+  // Sort by commence_time
+  var sorted=events.slice().sort(function(a,b){return (a.commence_time||'').localeCompare(b.commence_time||'');});
+  var html='<div class="st" style="margin:12px 0 8px">📋 Matchs collectés</div>';
+  sorted.forEach(function(ev){
+    var home=ev.home_team||'?';
+    var away=ev.away_team||'?';
+    var ts=ev.commence_time||'';
+    var dateStr='',timeStr='';
+    if(ts){try{var d=new Date(ts);dateStr=d.toLocaleDateString('fr');timeStr=d.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});}catch(e){}}
+    var bkList=ev.bookmakers||[];
+    var bestBk=bkList[0];
+    ['pinnacle','bet365','unibet','betfair'].forEach(function(bkId){var f=bkList.find(function(b){return b.key===bkId;});if(f)bestBk=f;});
+    if(!bestBk&&bkList.length)bestBk=bkList[0];
+    html+='<div class="mc soon" style="margin-bottom:8px">';
+    html+='<div class="mt-row"><span class="ml">'+dateStr+(timeStr?' · '+timeStr:'')+'</span>';
+    html+='<span style="font-size:.58rem;color:var(--dm);font-family:var(--mono)">'+bkList.length+' bookmaker'+(bkList.length>1?'s':'')+'</span></div>';
+    html+='<div class="mte"><div class="tn th">'+home+'</div><div class="msc" style="font-size:.8rem;padding:4px 9px;color:var(--dm)">vs</div><div class="tn ta">'+away+'</div></div>';
+    if(bestBk){
+      (bestBk.markets||[]).forEach(function(mkt){
+        var mktName=mkt.key;
+        html+='<div class="mkt-section">';
+        var mktLabel={'h2h':'1X2','doublechance':'Double Chance','totals':'Over/Under','btts':'BTTS'}[mktName]||mktName;
+        html+='<div class="mkt-section-title">'+mktLabel+'</div>';
+        if(mktName==='h2h'){
+          var vals={};(mkt.outcomes||[]).forEach(function(o){vals[o.name]=o.price;});
+          var c1=vals[home],cx=vals['Draw'],c2=vals[away];
+          html+='<div class="mkt-grid g3r">';
+          html+=oddsBox('1',c1);html+=oddsBox('X',cx);html+=oddsBox('2',c2);
+          html+='</div>';
+        } else if(mktName==='doublechance'){
+          var vals={};(mkt.outcomes||[]).forEach(function(o){vals[o.name]=o.price;});
+          html+='<div class="mkt-grid g3r">';
+          html+=oddsBox('1X',vals['Home/Draw']);html+=oddsBox('12',vals['Home/Away']);html+=oddsBox('X2',vals['Draw/Away']);
+          html+='</div>';
+        } else if(mktName==='totals'){
+          var over=null,under=null,point=null;
+          (mkt.outcomes||[]).forEach(function(o){
+            if(o.name==='Over'){over=o.price;if(o.point!==undefined)point=o.point;}
+            if(o.name==='Under'){under=o.price;}
+          });
+          html+='<div class="mkt-grid g3r">';
+          html+=oddsBox('Over '+(point||2.5),over);html+=oddsBox('Under '+(point||2.5),under);
+          html+='</div>';
+        } else if(mktName==='btts'){
+          var vals={};(mkt.outcomes||[]).forEach(function(o){vals[o.name]=o.price;});
+          html+='<div class="mkt-grid g3r">';
+          html+=oddsBox('Oui',vals['Yes']);html+=oddsBox('Non',vals['No']);
+          html+='</div>';
+        }
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+  });
+  out.innerHTML=html;
+  out.style.display='block';
+}
+function oddsBox(label,cote){
+  var col=cote?(cote<1.5?'var(--g)':cote<2.5?'var(--y)':'var(--r)'):'var(--dm)';
+  return '<div class="mkt-box" style="padding:7px 3px">'
+    +'<div class="mkt-prob" style="color:'+col+'">'+(cote?cote.toFixed(2):'—')+'</div>'
+    +'<div class="mkt-lbl">'+label+'</div>'
+    +'</div>';
 }
 
 async function collectOdds(){
@@ -3285,6 +3411,7 @@ async function collectOdds(){
     var fetched=normalizeOddsApiResponse(data,mktSel);
     document.getElementById('oddsLd').classList.remove('on');
     updateOddsSummary();
+    renderCollectedOdds(data, mktSel);
     showAl('oddsAl','ok',fetched+' matchs avec cotes récupérés pour '+document.getElementById('oddsSport').options[document.getElementById('oddsSport').selectedIndex].text);
   }catch(e){
     document.getElementById('oddsLd').classList.remove('on');
