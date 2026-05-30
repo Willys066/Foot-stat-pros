@@ -1007,104 +1007,48 @@ tr:hover td{background:var(--s2)}
 <div class="panel" id="p8">
   <div class="info-api" style="margin-bottom:10px"><strong>The Odds API :</strong> Inscris-toi sur <a href="https://the-odds-api.com" target="_blank" style="color:var(--g)">the-odds-api.com</a> · Plan gratuit : 500 req/mois · Clé à saisir dans Config</div>
   <div class="card">
-    <span class="clbl">Collecte des cotes</span>
-    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Récupère les cotes bookmakers via The Odds API (plan gratuit). Données en temps réel ou à venir.</p>
+    <span class="clbl">Collecte globale des cotes</span>
+    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Détecte automatiquement toutes les compétitions foot actives via The Odds API et récupère les cotes en une seule opération.</p>
     <div style="margin-bottom:10px">
-      <div class="lsm">Championnat</div>
-      <select class="inp" id="oddsSport">
-        <optgroup label="🏆 Coupes européennes">
-          <option value="soccer_uefa_champs_league">Champions League</option>
-          <option value="soccer_uefa_europa_league">Europa League</option>
-          <option value="soccer_uefa_europa_conference_league">Conference League</option>
-        </optgroup>
-        <optgroup label="🇫🇷 France">
-          <option value="soccer_france_ligue_one">Ligue 1</option>
-          <option value="soccer_france_ligue_two">Ligue 2</option>
-        </optgroup>
-        <optgroup label="🏴󠁧󠁢󠁥󠁮󠁧󠁿 Angleterre">
-          <option value="soccer_epl">Premier League</option>
-          <option value="soccer_england_league1">Championship</option>
-          <option value="soccer_england_league2">League One</option>
-        </optgroup>
-        <optgroup label="🇪🇸 Espagne">
-          <option value="soccer_spain_la_liga">La Liga</option>
-          <option value="soccer_spain_segunda_division">La Liga 2</option>
-        </optgroup>
-        <optgroup label="🇩🇪 Allemagne">
-          <option value="soccer_germany_bundesliga">Bundesliga</option>
-          <option value="soccer_germany_bundesliga2">2. Bundesliga</option>
-        </optgroup>
-        <optgroup label="🇮🇹 Italie">
-          <option value="soccer_italy_serie_a">Serie A</option>
-          <option value="soccer_italy_serie_b">Serie B</option>
-        </optgroup>
-        <optgroup label="🇳🇱 Pays-Bas / 🇵🇹 Portugal / 🇹🇷 Turquie">
-          <option value="soccer_netherlands_eredivisie">Eredivisie (Pays-Bas)</option>
-          <option value="soccer_portugal_primeira_liga">Primeira Liga (Portugal)</option>
-          <option value="soccer_turkey_super_league">Süper Lig (Turquie)</option>
-        </optgroup>
-        <optgroup label="🇧🇪 🇦🇹 🇨🇭 🇬🇷 🇷🇴 🇵🇱">
-          <option value="soccer_belgium_first_div">Jupiler Pro League (Belgique)</option>
-          <option value="soccer_austria_bundesliga">Bundesliga (Autriche)</option>
-          <option value="soccer_switzerland_superleague">Super League (Suisse)</option>
-          <option value="soccer_greece_super_league">Super League (Grèce)</option>
-          <option value="soccer_romania_1_liga">Liga I (Roumanie)</option>
-          <option value="soccer_poland_ekstraklasa">Ekstraklasa (Pologne)</option>
-        </optgroup>
-        <optgroup label="🏴󠁧󠁢󠁳󠁣󠁴󠁿 🇷🇺 🇩🇰 🇸🇪 🇳🇴">
-          <option value="soccer_scotland_premiership">Scottish Premiership</option>
-          <option value="soccer_russia_premier_league">Premier League (Russie)</option>
-          <option value="soccer_denmark_superliga">Superliga (Danemark)</option>
-          <option value="soccer_sweden_allsvenskan">Allsvenskan (Suède)</option>
-          <option value="soccer_norway_eliteserien">Eliteserien (Norvège)</option>
-        </optgroup>
-        <optgroup label="🌎 Amériques">
-          <option value="soccer_usa_mls">MLS (USA)</option>
-          <option value="soccer_mexico_ligamx">Liga MX (Mexique)</option>
-          <option value="soccer_brazil_campeonato">Brasileirão Serie A</option>
-          <option value="soccer_argentina_primera_division">Primera División (Argentine)</option>
-          <option value="soccer_conmebol_copa_libertadores">Copa Libertadores</option>
-        </optgroup>
-        <optgroup label="🌏 Asie / Océanie">
-          <option value="soccer_japan_j_league">J1 League (Japon)</option>
-          <option value="soccer_korea_kleague1">K League 1 (Corée)</option>
-          <option value="soccer_australia_aleague">A-League (Australie)</option>
-          <option value="soccer_china_superleague">Super League (Chine)</option>
-        </optgroup>
-        <optgroup label="🌍 Afrique / Autres">
-          <option value="soccer_south_africa_premier_division">Premier Division (Afrique du Sud)</option>
-        </optgroup>
-      </select>
+      <div class="lsm">Marchés à collecter</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="oddsMktsChips">
+        <div class="chip on" data-mkt="h2h" onclick="toggleOddsMkt(this)">1X2</div>
+        <div class="chip on" data-mkt="doublechance" onclick="toggleOddsMkt(this)">Double Chance</div>
+        <div class="chip on" data-mkt="totals" onclick="toggleOddsMkt(this)">Over/Under</div>
+        <div class="chip on" data-mkt="btts" onclick="toggleOddsMkt(this)">BTTS</div>
+      </div>
     </div>
-    <div style="margin-bottom:10px">
-      <div class="lsm">Marché</div>
-      <select class="inp" id="oddsMkt">
-        <option value="h2h">1X2 (Match Winner)</option>
-        <option value="doublechance">Double Chance (1X / 12 / X2)</option>
-        <option value="totals">Over/Under buts</option>
-        <option value="btts">BTTS (Les deux marquent)</option>
-      </select>
-    </div>
-    <div style="margin-bottom:10px">
+    <div style="margin-bottom:12px">
       <div class="lsm">Format des cotes</div>
       <div class="chips" id="oddsFormatChips">
         <div class="chip on" onclick="setOddsFormat('decimal',this)">Décimal</div>
         <div class="chip" onclick="setOddsFormat('american',this)">Américain</div>
       </div>
     </div>
-    <button class="btn bb" onclick="collectOdds()" style="margin-bottom:7px">📡 Collecter les cotes</button>
+    <!-- Progress bar collecte globale -->
+    <div id="oddsGlobalProgress" style="display:none;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:.62rem;color:var(--dm);font-family:var(--mono)" id="oddsProgressLbl">Chargement des compétitions...</span>
+        <span style="font-size:.62rem;color:var(--g);font-family:var(--mono)" id="oddsProgressPct">0%</span>
+      </div>
+      <div style="height:4px;background:var(--s2);border-radius:2px;overflow:hidden">
+        <div id="oddsProgressBar" style="height:100%;background:linear-gradient(90deg,var(--g),var(--teal));border-radius:2px;width:0%;transition:width .3s"></div>
+      </div>
+      <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:4px" id="oddsProgressSub"></div>
+    </div>
+    <button class="btn bb" id="btnCollectOdds" onclick="collectOddsGlobal()" style="margin-bottom:7px">🌍 Collecter toutes les cotes</button>
     <button class="bsm" onclick="calcOddsStats()" style="width:100%;padding:9px;text-align:center;color:var(--g)">📊 Analyser les stats cotes</button>
     <div id="oddsQuotaInfo" style="display:none;margin-top:8px;font-size:.62rem;color:var(--dm);font-family:var(--mono);padding:6px 9px;background:rgba(61,155,255,.05);border-radius:6px;border:1px solid rgba(61,155,255,.2)"></div>
   </div>
-  <div class="ld" id="oddsLd"><div class="sp"></div><p>Collecte des cotes...</p></div>
   <div class="al" id="oddsAl"></div>
 
   <!-- Résumé collecte -->
   <div id="oddsSummary" style="display:none;margin-bottom:8px">
-    <div class="sg g3">
+    <div class="sg g4">
       <div class="sb"><div class="sv" id="oddsTotM" style="color:var(--b)">0</div><div class="sl">Matchs</div></div>
+      <div class="sb"><div class="sv" id="oddsTotL" style="color:var(--p)">0</div><div class="sl">Ligues</div></div>
       <div class="sb"><div class="sv" id="oddsTotO" style="color:var(--g)">0</div><div class="sl">Cotes</div></div>
-      <div class="sb"><div class="sv" id="oddsLastUp" style="color:var(--y);font-size:.7rem">—</div><div class="sl">Dernière MAJ</div></div>
+      <div class="sb"><div class="sv" id="oddsLastUp" style="color:var(--y);font-size:.7rem">—</div><div class="sl">MAJ</div></div>
     </div>
   </div>
 
@@ -3217,12 +3161,174 @@ function initOddsDates(){
 function updateOddsSummary(){
   var odb=getOddsDB();
   var mIds=Object.keys(odb),totO=0;
-  mIds.forEach(function(id){totO+=Object.keys(odb[id].markets||{}).length;});
+  var ligues=new Set();
+  mIds.forEach(function(id){
+    totO+=Object.keys(odb[id].markets||{}).length;
+    if(odb[id].sport)ligues.add(odb[id].sport);
+  });
   document.getElementById('oddsTotM').textContent=mIds.length;
+  document.getElementById('oddsTotL').textContent=ligues.size;
   document.getElementById('oddsTotO').textContent=totO;
-  document.getElementById('oddsLastUp').textContent=mIds.length?new Date().toLocaleDateString('fr'):'—';
+  document.getElementById('oddsLastUp').textContent=mIds.length?new Date().toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'}):'—';
   document.getElementById('oddsSummary').style.display=mIds.length?'block':'none';
 }
+
+function toggleOddsMkt(el){el.classList.toggle('on');}
+
+function getSelectedOddsMkts(){
+  var chips=document.querySelectorAll('#oddsMktsChips .chip.on');
+  var mkts=[];chips.forEach(function(c){mkts.push(c.dataset.mkt);});
+  return mkts;
+}
+
+var oddsCollectStop=false;
+
+async function collectOddsGlobal(){
+  var key=cfg.oddsApiKey;
+  if(!key){showAl('oddsAl','er','Clé The Odds API manquante — configure-la dans Config');return;}
+  var mkts=getSelectedOddsMkts();
+  if(!mkts.length){showAl('oddsAl','er','Sélectionne au moins un marché');return;}
+
+  hideAl('oddsAl');
+  oddsCollectStop=false;
+  var btn=document.getElementById('btnCollectOdds');
+  btn.disabled=true;btn.textContent='⏳ Collecte en cours...';
+  document.getElementById('oddsOut').style.display='none';
+  var prog=document.getElementById('oddsGlobalProgress');
+  prog.style.display='block';
+  setOddsProgress('Récupération des compétitions actives...', 0, '');
+
+  try{
+    // Step 1 : récupérer toutes les compétitions foot actives
+    var sportsResp=await fetch('https://api.the-odds-api.com/v4/sports/?apiKey='+encodeURIComponent(key)+'&all=false');
+    if(!sportsResp.ok){var t=await sportsResp.text();throw new Error('Sports API ('+sportsResp.status+'): '+t.substring(0,100));}
+    var allSports=await sportsResp.json();
+    var soccerSports=allSports.filter(function(s){return s.group==='Soccer'&&s.active&&!s.has_outrights;});
+    if(!soccerSports.length){throw new Error('Aucune compétition foot active trouvée');}
+
+    setOddsProgress('0 / '+soccerSports.length+' compétitions',0,'Effacement de l\'ancienne base...');
+    // Clear old DB
+    setOddsDB({});
+    var odb={};
+    var totalFetched=0,done=0,errors=0;
+    var allEvents=[];
+
+    // Step 2 : fetch chaque compétition séquentiellement (éviter rate limit)
+    for(var i=0;i<soccerSports.length;i++){
+      if(oddsCollectStop)break;
+      var sport=soccerSports[i];
+      var pct=Math.round(i/soccerSports.length*100);
+      setOddsProgress(i+' / '+soccerSports.length+' · '+totalFetched+' matchs', pct, sport.title||sport.key);
+
+      try{
+        var marketsParam=mkts.join(',');
+        var url='https://api.the-odds-api.com/v4/sports/'+sport.key+'/odds/'
+          +'?apiKey='+encodeURIComponent(key)
+          +'&regions=eu'
+          +'&markets='+encodeURIComponent(marketsParam)
+          +'&oddsFormat='+(oddsFormat||'decimal')
+          +'&dateFormat=iso';
+        var resp=await fetch(url);
+        // quota header
+        var remaining=resp.headers.get('x-requests-remaining');
+        var used=resp.headers.get('x-requests-used');
+        if(remaining!==null){
+          var infoEl=document.getElementById('oddsQuotaInfo');
+          if(infoEl){infoEl.textContent='Quota : '+remaining+' req restantes ('+used+' utilisées)';infoEl.style.display='block';}
+        }
+        if(resp.status===401||resp.status===403){throw new Error('Clé API invalide ou quota dépassé');}
+        if(resp.status===422){done++;continue;} // no events for this sport
+        if(!resp.ok){errors++;done++;continue;}
+        var events=await resp.json();
+        if(Array.isArray(events)&&events.length){
+          events.forEach(function(ev){ev._sport=sport;});
+          allEvents=allEvents.concat(events);
+          // Store immediately
+          events.forEach(function(ev){
+            var fid=ev.id;
+            var homeTeam=ev.home_team||'?';
+            var awayTeam=ev.away_team||'?';
+            var commenceTime=ev.commence_time||'';
+            var date=commenceTime?commenceTime.split('T')[0]:'';
+            var markets=normalizeEventMarkets(ev,homeTeam,awayTeam,mkts);
+            if(Object.keys(markets).length){
+              odb[fid]={date:date,fixtureId:fid,homeTeam:homeTeam,awayTeam:awayTeam,
+                        commenceTime:commenceTime,markets:markets,
+                        sport:sport.key,sportTitle:sport.title||sport.key,
+                        sportGroup:sport.group||'Soccer',
+                        source:'the-odds-api',fetchedAt:Date.now()};
+              totalFetched++;
+            }
+          });
+        }
+        done++;
+      }catch(err){
+        if(err.message.indexOf('Clé API')>=0||err.message.indexOf('quota')>=0)throw err;
+        errors++;done++;
+      }
+      // Small delay to avoid hammering the API
+      await new Promise(function(r){setTimeout(r,120);});
+    }
+
+    setOddsDB(odb);
+    prog.style.display='none';
+    updateOddsSummary();
+    renderCollectedOdds(allEvents, mkts);
+    var msg=totalFetched+' matchs collectés sur '+soccerSports.length+' compétitions';
+    if(errors)msg+=' ('+errors+' ignorées)';
+    showAl('oddsAl','ok',msg);
+
+  }catch(e){
+    document.getElementById('oddsGlobalProgress').style.display='none';
+    showAl('oddsAl','er','Erreur : '+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent='🌍 Collecter toutes les cotes';
+  }
+}
+
+function setOddsProgress(label,pct,sub){
+  document.getElementById('oddsProgressLbl').textContent=label;
+  document.getElementById('oddsProgressPct').textContent=pct+'%';
+  document.getElementById('oddsProgressBar').style.width=pct+'%';
+  document.getElementById('oddsProgressSub').textContent=sub||'';
+}
+
+// Extract & normalize markets from a single event (multi-market)
+function normalizeEventMarkets(ev,homeTeam,awayTeam,mktKeys){
+  var bkList=ev.bookmakers||[];
+  var bestBk=bkList[0];
+  ['pinnacle','bet365','unibet','betfair'].forEach(function(bkId){
+    var f=bkList.find(function(b){return b.key===bkId;});if(f)bestBk=f;
+  });
+  if(!bestBk&&bkList.length)bestBk=bkList[0];
+  if(!bestBk)return{};
+  var markets={};
+  (bestBk.markets||[]).forEach(function(mkt){
+    var mktName=mkt.key;
+    var vals={};
+    (mkt.outcomes||[]).forEach(function(o){
+      vals[o.name]=parseFloat(o.price)||null;
+      if(o.point!==undefined)vals[o.name+'_point']=o.point;
+    });
+    if(mktName==='h2h'){
+      markets['Match Winner']={'Home':vals[homeTeam]||null,'Draw':vals['Draw']||null,'Away':vals[awayTeam]||null};
+    } else if(mktName==='totals'){
+      var ok=Object.keys(vals).find(function(k){return k.startsWith('Over');});
+      var uk=Object.keys(vals).find(function(k){return k.startsWith('Under');});
+      markets['Goals Over/Under']={};
+      if(vals[ok])markets['Goals Over/Under']['Over 2.5']=vals[ok];
+      if(vals[uk])markets['Goals Over/Under']['Under 2.5']=vals[uk];
+    } else if(mktName==='btts'){
+      markets['Both Teams Score']={'Yes':vals['Yes']||null,'No':vals['No']||null};
+    } else if(mktName==='doublechance'){
+      markets['Double Chance']={'1X':vals['Home/Draw']||null,'12':vals['Home/Away']||null,'X2':vals['Draw/Away']||null};
+    }
+  });
+  return markets;
+}
+
+// Keep old collectOdds as alias for backward compat (used by calcOddsStats etc.)
+async function collectOdds(){return collectOddsGlobal();}
 
 // ── The Odds API helper ──
 async function fetchOddsApi(sport,markets,oddsFormat){
@@ -3250,72 +3356,20 @@ async function fetchOddsApi(sport,markets,oddsFormat){
   return resp.json();
 }
 
-// Normalise les cotes The Odds API en format interne
+// Normalise les cotes The Odds API en format interne (single-sport legacy)
 function normalizeOddsApiResponse(events,mktType){
   var odb=getOddsDB();
   var fetched=0;
   events.forEach(function(ev){
-    var fid=ev.id; // string id from the-odds-api
+    var fid=ev.id;
     var homeTeam=ev.home_team||'?';
     var awayTeam=ev.away_team||'?';
     var commenceTime=ev.commence_time||'';
     var date=commenceTime?commenceTime.split('T')[0]:'';
-    var markets={};
-    // Agréger toutes les cotes des bookmakers disponibles (moyenne ou premier dispo)
-    // On prend les cotes du premier bookmaker qui a les données complètes
-    var bkList=ev.bookmakers||[];
-    var bestBk=bkList[0]; // Pinnacle > Bet365 si dispo
-    ['pinnacle','bet365','unibet','betfair'].forEach(function(bkId){
-      var found=bkList.find(function(b){return b.key===bkId;});
-      if(found)bestBk=found;
-    });
-    if(!bestBk&&bkList.length)bestBk=bkList[0];
-    if(!bestBk)return;
-    (bestBk.markets||[]).forEach(function(mkt){
-      var mktName=mkt.key;
-      var vals={};
-      (mkt.outcomes||[]).forEach(function(o){
-        vals[o.name]=parseFloat(o.price)||null;
-        // Pour Over/Under, stocker aussi le point
-        if(o.point!==undefined)vals[o.name+'_point']=o.point;
-      });
-      // Normaliser les noms vers le format interne
-      if(mktName==='h2h'){
-        markets['Match Winner']={
-          'Home':vals[homeTeam]||null,
-          'Draw':vals['Draw']||null,
-          'Away':vals[awayTeam]||null
-        };
-      } else if(mktName==='totals'){
-        // Trouver Over/Under 2.5 (ou le plus proche)
-        var overKey=Object.keys(vals).find(function(k){return k.startsWith('Over')});
-        var underKey=Object.keys(vals).find(function(k){return k.startsWith('Under')});
-        markets['Goals Over/Under']={};
-        if(vals[overKey])markets['Goals Over/Under']['Over 2.5']=vals[overKey];
-        if(vals[underKey])markets['Goals Over/Under']['Under 2.5']=vals[underKey];
-      } else if(mktName==='btts'){
-        markets['Both Teams Score']={
-          'Yes':vals['Yes']||null,
-          'No':vals['No']||null
-        };
-      } else if(mktName==='doublechance'){
-        markets['Double Chance']={
-          '1X':vals['Home/Draw']||null,
-          '12':vals['Home/Away']||null,
-          'X2':vals['Draw/Away']||null
-        };
-      }
-    });
+    var markets=normalizeEventMarkets(ev,homeTeam,awayTeam,[mktType]);
     if(Object.keys(markets).length){
-      // Stocker avec l'id The Odds API + infos équipes pour matching manuel
-      odb[fid]={
-        date:date,fixtureId:fid,
-        homeTeam:homeTeam,awayTeam:awayTeam,
-        commenceTime:commenceTime,
-        markets:markets,
-        source:'the-odds-api',
-        fetchedAt:Date.now()
-      };
+      odb[fid]={date:date,fixtureId:fid,homeTeam:homeTeam,awayTeam:awayTeam,
+                commenceTime:commenceTime,markets:markets,source:'the-odds-api',fetchedAt:Date.now()};
       fetched++;
     }
   });
@@ -3323,100 +3377,99 @@ function normalizeOddsApiResponse(events,mktType){
   return fetched;
 }
 
-// ── Render collected odds as match cards ──
-function renderCollectedOdds(events, mktSel){
+// ── Render collected odds grouped by competition ──
+function renderCollectedOdds(events, mkts){
   var out=document.getElementById('oddsOut');
   if(!events||!events.length){out.style.display='none';return;}
-  // Sort by commence_time
-  var sorted=events.slice().sort(function(a,b){return (a.commence_time||'').localeCompare(b.commence_time||'');});
-  var html='<div class="st" style="margin:12px 0 8px">📋 Matchs collectés</div>';
-  sorted.forEach(function(ev){
-    var home=ev.home_team||'?';
-    var away=ev.away_team||'?';
-    var ts=ev.commence_time||'';
-    var dateStr='',timeStr='';
-    if(ts){try{var d=new Date(ts);dateStr=d.toLocaleDateString('fr');timeStr=d.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});}catch(e){}}
-    var bkList=ev.bookmakers||[];
-    var bestBk=bkList[0];
-    ['pinnacle','bet365','unibet','betfair'].forEach(function(bkId){var f=bkList.find(function(b){return b.key===bkId;});if(f)bestBk=f;});
-    if(!bestBk&&bkList.length)bestBk=bkList[0];
-    html+='<div class="mc soon" style="margin-bottom:8px">';
-    html+='<div class="mt-row"><span class="ml">'+dateStr+(timeStr?' · '+timeStr:'')+'</span>';
-    html+='<span style="font-size:.58rem;color:var(--dm);font-family:var(--mono)">'+bkList.length+' bookmaker'+(bkList.length>1?'s':'')+'</span></div>';
-    html+='<div class="mte"><div class="tn th">'+home+'</div><div class="msc" style="font-size:.8rem;padding:4px 9px;color:var(--dm)">vs</div><div class="tn ta">'+away+'</div></div>';
-    if(bestBk){
-      (bestBk.markets||[]).forEach(function(mkt){
-        var mktName=mkt.key;
-        html+='<div class="mkt-section">';
-        var mktLabel={'h2h':'1X2','doublechance':'Double Chance','totals':'Over/Under','btts':'BTTS'}[mktName]||mktName;
-        html+='<div class="mkt-section-title">'+mktLabel+'</div>';
-        if(mktName==='h2h'){
-          var vals={};(mkt.outcomes||[]).forEach(function(o){vals[o.name]=o.price;});
-          var c1=vals[home],cx=vals['Draw'],c2=vals[away];
-          html+='<div class="mkt-grid g3r">';
-          html+=oddsBox('1',c1);html+=oddsBox('X',cx);html+=oddsBox('2',c2);
-          html+='</div>';
-        } else if(mktName==='doublechance'){
-          var vals={};(mkt.outcomes||[]).forEach(function(o){vals[o.name]=o.price;});
-          html+='<div class="mkt-grid g3r">';
-          html+=oddsBox('1X',vals['Home/Draw']);html+=oddsBox('12',vals['Home/Away']);html+=oddsBox('X2',vals['Draw/Away']);
-          html+='</div>';
-        } else if(mktName==='totals'){
-          var over=null,under=null,point=null;
-          (mkt.outcomes||[]).forEach(function(o){
-            if(o.name==='Over'){over=o.price;if(o.point!==undefined)point=o.point;}
-            if(o.name==='Under'){under=o.price;}
-          });
-          html+='<div class="mkt-grid g3r">';
-          html+=oddsBox('Over '+(point||2.5),over);html+=oddsBox('Under '+(point||2.5),under);
-          html+='</div>';
-        } else if(mktName==='btts'){
-          var vals={};(mkt.outcomes||[]).forEach(function(o){vals[o.name]=o.price;});
-          html+='<div class="mkt-grid g3r">';
-          html+=oddsBox('Oui',vals['Yes']);html+=oddsBox('Non',vals['No']);
-          html+='</div>';
-        }
-        html+='</div>';
-      });
-    }
-    html+='</div>';
+
+  // Group by sport
+  var byLeague={};
+  events.forEach(function(ev){
+    var sport=ev._sport;
+    var key=sport?sport.key:(ev.sport_key||'?');
+    var title=sport?sport.title:(ev.sport_title||'Inconnue');
+    if(!byLeague[key])byLeague[key]={title:title,events:[]};
+    byLeague[key].events.push(ev);
   });
+
+  var sortedKeys=Object.keys(byLeague).sort(function(a,b){
+    return byLeague[b].events.length-byLeague[a].events.length;
+  });
+
+  var html='<div class="st" style="margin:12px 0 8px">📋 '+events.length+' matchs · '+sortedKeys.length+' compétitions</div>';
+
+  sortedKeys.forEach(function(key,idx){
+    var league=byLeague[key];
+    var sorted=league.events.slice().sort(function(a,b){return (a.commence_time||'').localeCompare(b.commence_time||'');});
+    var isOpen=idx<3;
+    html+='<div class="lg-group">';
+    html+='<div class="lg-header'+(isOpen?' open':'')+'" onclick="toggleLgOdds(this)">';
+    html+='<div class="lg-header-left"><div class="lg-name">'+league.title+'</div></div>';
+    html+='<div class="lg-badges"><span class="lg-nb">'+sorted.length+' match'+(sorted.length>1?'s':'')+'</span></div>';
+    html+='<span class="lg-arrow">▶</span></div>';
+    html+='<div class="lg-body'+(isOpen?' open':'')+'" style="padding:8px">';
+
+    sorted.forEach(function(ev){
+      var home=ev.home_team||'?';
+      var away=ev.away_team||'?';
+      var ts=ev.commence_time||'';
+      var dateStr='',timeStr='';
+      if(ts){try{var d=new Date(ts);dateStr=d.toLocaleDateString('fr');timeStr=d.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});}catch(e){}}
+      var bkList=ev.bookmakers||[];
+      var bestBk=bkList[0];
+      ['pinnacle','bet365','unibet','betfair'].forEach(function(bkId){var f=bkList.find(function(b){return b.key===bkId;});if(f)bestBk=f;});
+      if(!bestBk&&bkList.length)bestBk=bkList[0];
+
+      html+='<div class="mc soon" style="margin-bottom:8px">';
+      html+='<div class="mt-row"><span class="ml">'+dateStr+(timeStr?' · '+timeStr:'')+'</span>';
+      html+='<span style="font-size:.56rem;color:var(--dm);font-family:var(--mono)">'+bkList.length+' bk</span></div>';
+      html+='<div class="mte"><div class="tn th" style="font-size:.8rem">'+home+'</div>';
+      html+='<div class="msc" style="font-size:.72rem;padding:3px 8px;color:var(--dm)">vs</div>';
+      html+='<div class="tn ta" style="font-size:.8rem">'+away+'</div></div>';
+
+      if(bestBk){
+        (bestBk.markets||[]).forEach(function(mkt){
+          var mktName=mkt.key;
+          var mktLabel={'h2h':'1X2','doublechance':'Double Chance','totals':'Over/Under','btts':'BTTS'}[mktName]||mktName;
+          var vals={};var point=null;
+          (mkt.outcomes||[]).forEach(function(o){
+            vals[o.name]=parseFloat(o.price)||null;
+            if(o.point!==undefined)point=o.point;
+          });
+          html+='<div class="mkt-section"><div class="mkt-section-title">'+mktLabel+'</div><div class="mkt-grid g3r">';
+          if(mktName==='h2h'){
+            html+=oddsBox('1',vals[home])+oddsBox('X',vals['Draw'])+oddsBox('2',vals[away]);
+          } else if(mktName==='doublechance'){
+            html+=oddsBox('1X',vals['Home/Draw'])+oddsBox('12',vals['Home/Away'])+oddsBox('X2',vals['Draw/Away']);
+          } else if(mktName==='totals'){
+            html+=oddsBox('Over '+(point||2.5),vals['Over'])+oddsBox('Under '+(point||2.5),vals['Under']);
+          } else if(mktName==='btts'){
+            html+=oddsBox('Oui',vals['Yes'])+oddsBox('Non',vals['No']);
+          }
+          html+='</div></div>';
+        });
+      }
+      html+='</div>';
+    });
+    html+='</div></div>';
+  });
+
   out.innerHTML=html;
   out.style.display='block';
 }
+
+function toggleLgOdds(header){
+  header.classList.toggle('open');
+  var body=header.nextElementSibling;
+  if(body)body.classList.toggle('open');
+}
+
 function oddsBox(label,cote){
   var col=cote?(cote<1.5?'var(--g)':cote<2.5?'var(--y)':'var(--r)'):'var(--dm)';
   return '<div class="mkt-box" style="padding:7px 3px">'
     +'<div class="mkt-prob" style="color:'+col+'">'+(cote?cote.toFixed(2):'—')+'</div>'
     +'<div class="mkt-lbl">'+label+'</div>'
     +'</div>';
-}
-
-async function collectOdds(){
-  var key=cfg.oddsApiKey;
-  if(!key){showAl('oddsAl','er','Cl\u00e9 The Odds API manquante \u2014 configure-la dans l\'onglet Config');return}
-  var sport=document.getElementById('oddsSport').value;
-  var mktSel=document.getElementById('oddsMkt').value;
-  hideAl('oddsAl');
-  document.getElementById('oddsLd').classList.add('on');
-  document.getElementById('oddsOut').style.display='none';
-
-  try{
-    var data=await fetchOddsApi(sport,mktSel,oddsFormat);
-    if(!Array.isArray(data)||!data.length){
-      document.getElementById('oddsLd').classList.remove('on');
-      showAl('oddsAl','ayw','Aucun match à venir pour ce championnat actuellement.');
-      return;
-    }
-    var fetched=normalizeOddsApiResponse(data,mktSel);
-    document.getElementById('oddsLd').classList.remove('on');
-    updateOddsSummary();
-    renderCollectedOdds(data, mktSel);
-    showAl('oddsAl','ok',fetched+' matchs avec cotes récupérés pour '+document.getElementById('oddsSport').options[document.getElementById('oddsSport').selectedIndex].text);
-  }catch(e){
-    document.getElementById('oddsLd').classList.remove('on');
-    showAl('oddsAl','er','Erreur : '+e.message);
-  }
 }
 
 // Convertit cote en probabilité implicite (avec marge)
