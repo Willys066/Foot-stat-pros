@@ -1037,8 +1037,36 @@ tr:hover td{background:var(--s2)}
       </div>
       <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:4px" id="oddsProgressSub"></div>
     </div>
-    <button class="btn bb" id="btnCollectOdds" onclick="collectOddsGlobal()" style="margin-bottom:7px">🌍 Collecter toutes les cotes</button>
-    <button class="bsm" onclick="calcOddsStats()" style="width:100%;padding:9px;text-align:center;color:var(--g)">📊 Analyser les stats cotes</button>
+    <button class="btn bb" id="btnCollectOdds" onclick="collectOddsGlobal()" style="margin-bottom:10px">🌍 Collecter toutes les cotes</button>
+
+    <!-- Filtres analyse -->
+    <div style="background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:11px;margin-bottom:10px">
+      <div style="font-size:.58rem;letter-spacing:2px;color:var(--dm);font-family:var(--mono);margin-bottom:8px">FILTRES ANALYSE</div>
+
+      <div style="margin-bottom:8px">
+        <div class="lsm">Seuil edge value bet</div>
+        <div class="chips" id="edgeChips">
+          <div class="chip" onclick="setEdgeSeuil(2)">2%</div>
+          <div class="chip on" onclick="setEdgeSeuil(5)">5%</div>
+          <div class="chip" onclick="setEdgeSeuil(8)">8%</div>
+          <div class="chip" onclick="setEdgeSeuil(10)">10%</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:8px">
+        <div class="lsm">Marchés à analyser</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px" id="oddsMktFilter">
+          <div class="chip on" onclick="toggleOddsMktFilter(this,'all')" data-mkt="all">Tous</div>
+          <div class="chip" onclick="toggleOddsMktFilter(this,'1x2')" data-mkt="1x2">1X2</div>
+          <div class="chip" onclick="toggleOddsMktFilter(this,'ou')" data-mkt="ou">Over/Under</div>
+          <div class="chip" onclick="toggleOddsMktFilter(this,'btts')" data-mkt="btts">BTTS</div>
+          <div class="chip" onclick="toggleOddsMktFilter(this,'dc')" data-mkt="dc">DC</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="bsm" onclick="calcOddsStats()" style="width:100%;padding:9px;text-align:center;color:var(--g);margin-bottom:6px">📊 Analyser les stats cotes</button>
+    <button class="bsm" onclick="exportValueBets()" style="width:100%;padding:9px;text-align:center;color:var(--b)">⬇️ Exporter value bets CSV</button>
     <div id="oddsQuotaInfo" style="display:none;margin-top:8px;font-size:.62rem;color:var(--dm);font-family:var(--mono);padding:6px 9px;background:rgba(61,155,255,.05);border-radius:6px;border:1px solid rgba(61,155,255,.2)"></div>
   </div>
   <div class="al" id="oddsAl"></div>
@@ -2852,125 +2880,202 @@ async function loadMatchs(source){
   document.getElementById('tSoo').textContent=fx.filter(function(f){return TERM.indexOf(f.status)<0&&LIVE.indexOf(f.status)<0}).length;
   document.getElementById('tDon').textContent=fx.filter(function(f){return TERM.indexOf(f.status)>=0}).length;
   document.getElementById('tdSum').style.display='block';
-  renderMatchsList(); // Afficher les matchs immédiatement
-  // Charger les cotes en arrière-plan APRÈS l'affichage
-  if(cfg.oddsApiKey){
-    setTimeout(async function(){
-      try{
-        var oddsEvts=await fetchOddsApi('soccer','h2h,totals,btts','decimal');
-        if(oddsEvts&&oddsEvts.length){
-          attachOddsToMatchs(fx,oddsEvts);
-          renderMatchsList(); // Rafraîchir avec les cotes
-          showAl('tdAl','ok',fx.length+' matchs · '+countWithOdds(fx)+' cotes attachées');
-        }
-      }catch(e){/* silencieux */}
-    },500);
-  }
+  renderMatchsList();
 }
 function toggleAllGroups(open){
   document.querySelectorAll('.lg-body').forEach(function(b){b.classList.toggle('open',open)});
   document.querySelectorAll('.lg-header').forEach(function(h){h.classList.toggle('open',open)});
 }
 function renderMatchsList(){
-  window._matchRefs=[];var list=document.getElementById('tdList');list.innerHTML='';
-  // Pré-calculer stats 0-0 une seule fois (pas à chaque card)
+  var list=document.getElementById('tdList');
+  if(!list)return;
+  list.innerHTML='';
+  var bar=document.getElementById('tdExpandBar');
+  if(bar)bar.style.display='flex';
+
+  // PRÉ-CALCULER UNE SEULE FOIS (pas à chaque card)
   window._00stats=get00Stats();
-  // Appliquer recalage live si actif
-  if(recalageActive){
-    var liveCtxV2=buildLiveContextV2(allMatchsCache,seuilTd);
-    allMatchsCache.forEach(function(m){
-      if(m._pred)m._pred=applyRecalageToMatch(m,m._pred,liveCtxV2,seuilTd);
-    });
-  }
-  // Appliquer filtre mode sur tous les matchs en cache
+  window._calibCache=getCalib();
+  window._hasCalib=Object.keys(window._calibCache).length>0;
+
   var mode=document.getElementById('tdMode')?document.getElementById('tdMode').value:'all';
   var modeFiltered;
   if(mode==='soon') modeFiltered=allMatchsCache.filter(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
   else if(mode==='done') modeFiltered=allMatchsCache.filter(function(m){return TERM.indexOf(m.status)>=0});
   else if(mode==='live') modeFiltered=allMatchsCache.filter(function(m){return LIVE.indexOf(m.status)>=0});
   else modeFiltered=allMatchsCache.slice();
-  // Puis filtre convergence
-  var fx=modeFiltered.filter(function(m){if(convFilterVal===0)return true;return(m._pred?m._pred.convergence:0)>=convFilterVal});
-  if(!fx.length){list.innerHTML='<div style="text-align:center;color:var(--dm);padding:30px;font-size:.8rem">Aucun match. Baisse la convergence minimum.</div>';return}
-  var results=getRes(),track=getTrack();
-  // Build trackId set once for O(1) lookup instead of O(n) find per match
-  var trackIds=new Set(track.map(function(t){return t.id;}));
-  var trackDirty=false;
-  fx.forEach(function(m){
-    if(TERM.indexOf(m.status)>=0&&m.h!==null&&m.a!==null&&m._pred&&!trackIds.has(m.id)){
-      track.push(buildTrackEntry(m,m._pred,seuilTd,m.h,m.a));
-      trackIds.add(m.id);
-      trackDirty=true;
-    }
+
+  var fx=modeFiltered.filter(function(m){
+    if(convFilterVal===0)return true;
+    return(m._pred?m._pred.convergence:0)>=convFilterVal;
   });
-  if(trackDirty)setTrack(track); // write localStorage ONCE at end
+
+  if(!fx.length){
+    list.innerHTML='<div style="color:var(--dm);padding:20px;text-align:center;font-size:.8rem;font-family:var(--mono)">Aucun match pour ce filtre</div>';
+    return;
+  }
+
+  // Grouper par ligue
   var groups={};
-  fx.forEach(function(m){var k=m.league+'|||'+m.country;if(!groups[k])groups[k]={league:m.league,country:m.country,matchs:[]};groups[k].matchs.push(m)});
-  Object.keys(groups).forEach(function(gk){
+  fx.forEach(function(m){
+    var k=(m.country?m.country+' · ':'')+( m.league||'?');
+    if(!groups[k])groups[k]={matchs:[],hasLive:false,hasSoon:false};
+    groups[k].matchs.push(m);
+    if(LIVE.indexOf(m.status)>=0)groups[k].hasLive=true;
+    if(TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0)groups[k].hasSoon=true;
+  });
+
+  window._matchRefs=[];
+  var results=getRes();
+
+  Object.keys(groups).sort().forEach(function(gk){
     var g=groups[gk];
-    var ligRate=null,ligRateLabel='';
-    if(g.matchs.length>0&&g.matchs[0]._pred&&g.matchs[0]._pred.ligStats){
-      var ls=g.matchs[0]._pred.ligStats;
-      if(tdMkt==='totaux'||tdMkt==='auto'){ligRate=ls.over;ligRateLabel='Over +'+seuilTd+': '+ligRate+'%'}
-      else if(tdMkt==='v1x2'){ligRate=ls.v1;ligRateLabel='Dom: '+ls.v1+'%/Nul: '+ls.x+'%/Ext: '+ls.v2+'%'}
-      else if(tdMkt==='btts'){ligRate=ls.bttsO;ligRateLabel='BTTS: '+ligRate+'%'}
-      else if(tdMkt==='dc'){ligRate=ls.dc1x;ligRateLabel='DC1X: '+ls.dc1x+'%/DCX2: '+ls.dcx2+'%'}
-      else if(tdMkt==='cs'){ligRate=ls.csH;ligRateLabel='CS Dom: '+ls.csH+'%/CS Ext: '+ls.csA+'%'}
-    }
-    var highCorrelation=ligRate!==null&&ligRate>=70&&g.matchs.length>=2;
-    var lgBgCls=ligRate!==null?(ligRate>=60?'bgG':ligRate>=45?'bgY':'bgR'):'';
-    var groupDiv=document.createElement('div');groupDiv.className='lg-group';
-    var headerDiv=document.createElement('div');headerDiv.className='lg-header';
-    headerDiv.innerHTML='<div class="lg-header-left"><div class="lg-name">'+g.league+'</div><div class="lg-country">'+g.country+(ligRateLabel?' · '+ligRateLabel:'')+'</div></div><div class="lg-badges"><span class="lg-nb">'+g.matchs.length+' match'+(g.matchs.length>1?'s':'')+'</span>'+(ligRate!==null?'<span class="lbg '+lgBgCls+'" style="font-size:.7rem;padding:3px 8px;border-radius:5px">'+ligRate+'%</span>':'')+(highCorrelation?'<span class="lg-warn">⚠ corr.</span>':'')+'</div><span class="lg-arrow">▶</span>';
+    var noPredData=g.matchs.every(function(m){return!m._pred;});var defaultOpen=g.hasLive||g.hasSoon||noPredData||Object.keys(groups).length<=4;
+
+    var groupDiv=document.createElement('div');
+    groupDiv.style.marginBottom='8px';
+
+    var liveCnt=g.matchs.filter(function(m){return LIVE.indexOf(m.status)>=0}).length;
+    var headerDiv=document.createElement('div');
+    headerDiv.className='lg-header'+(defaultOpen?' open':'');
+    headerDiv.innerHTML='<span class="lg-name">'+gk+'</span><span class="lg-meta">'+g.matchs.length+(liveCnt?' · <span style="color:var(--r)">'+liveCnt+' live</span>':'')+'</span>';
+    headerDiv.onclick=function(){this.classList.toggle('open');bodyDiv.classList.toggle('open');};
+
     var bodyDiv=document.createElement('div');
-    // Ouvrir : groupes live, ou liste courte, ou convergence haute — fermer les groupes 100% terminés
-    var hasLive=g.matchs.some(function(m){return LIVE.indexOf(m.status)>=0});
-    var hasSoon=g.matchs.some(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
-    var hasHighConv=g.matchs.some(function(m){return(m._pred?m._pred.convergence:0)>=2});
-    var noPredData=g.matchs.every(function(m){return!m._pred});
-    var defaultOpen=hasLive||hasSoon||noPredData||Object.keys(groups).length<=4||hasHighConv;
-    bodyDiv.className='lg-body'+(defaultOpen?' open':'');headerDiv.classList.toggle('open',defaultOpen);
-    headerDiv.onclick=function(){bodyDiv.classList.toggle('open');this.classList.toggle('open')};
+    bodyDiv.className='lg-body'+(defaultOpen?' open':'');
+
     g.matchs.forEach(function(m){
-      var pred=m._pred,isLv=LIVE.indexOf(m.status)>=0,isDn=TERM.indexOf(m.status)>=0;
-      var cls=isLv?'live':isDn?'done':'soon';
-      var stxt=isLv?'LIVE '+m.elapsed+"'":isDn?'FT':m.heure;
-      var scls=isLv?'slv':isDn?'sdn':'ssn';
-      var score=(m.h!==null&&m.a!==null)?m.h+' - '+m.a:m.heure;
-      var res=results[m.id];
       var midx=window._matchRefs.length;
-      window._matchRefs[midx]={id:m.id,home:m.home,away:m.away,league:m.league,country:m.country,_seuil:seuilTd,_pred:pred?{plus:pred.plus,under:pred.under,v1:pred.v1,x:pred.x,v2:pred.v2,btts:pred.btts,bttsNon:pred.bttsNon,csH:pred.csH,csA:pred.csA,hmsc:pred.hmsc,amsc:pred.amsc,dc1x:pred.dc1x,dcx2:pred.dcx2,dc12:pred.dc12,conf:pred.conf,convergence:pred.convergence,nbSig:pred.nbSig}:null};
-      var resHTML='';
-      if(res){var tot=res.h+res.a,v1x2r=res.h>res.a?'V1':res.h<res.a?'V2':'X',ok=tot>seuilTd;resHTML='<div class="mr"><div class="rr"><span style="color:var(--dm)">Résultat</span><span style="font-weight:700">'+res.h+' - '+res.a+' ('+v1x2r+')</span></div><div class="rr"><span style="color:var(--dm)">+'+seuilTd+'</span><span style="color:'+(ok?'var(--g)':'var(--r)')+'">'+( ok?'OUI':'NON')+'</span></div><div class="rr"><span style="color:var(--dm)">BTTS</span><span style="color:'+(res.h>0&&res.a>0?'var(--g)':'var(--r)')+'">'+( res.h>0&&res.a>0?'OUI':'NON')+'</span></div></div>'}
-      var card=document.createElement('div');card.className='mc '+cls;card.style.marginBottom='7px';
+      window._matchRefs.push(m);
+
+      var pred=m._pred;
+      var res=results[m.id];
+      var isLive=LIVE.indexOf(m.status)>=0;
+      var isDone=TERM.indexOf(m.status)>=0;
+      var cls=isLive?'live':isDone?'done':'';
+      var scls=isLive?'sl':'sd';
+      var stxt=isLive?(m.status+(m.elapsed?' '+m.elapsed+'\'':'')):( isDone?(m.h+'-'+m.a):(m.heure||m.status));
+      var score=isDone||isLive?(m.h+'-'+m.a):'vs';
+
+      var card=document.createElement('div');
+      card.className='mc '+cls;
+      card.style.marginBottom='7px';
+
       try{
-        card.innerHTML='<div class="mt-row"><div class="ml">'+m.heure+'</div><div class="ms '+scls+'">'+stxt+'</div></div>'
-          +'<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'
-          +buildMatchHTML(m,pred,seuilTd)+resHTML
-          +'<div style="display:flex;gap:6px;margin-top:6px">'
-          +(!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')
-          +'<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">⚡ Analyser</button>'
-          +'<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">&#x1F4CA; Sc&#xe9;nario</button>'
-          +'</div>';
+        var html=buildMatchHTMLFast(m,pred,seuilTd,res);
+        card.innerHTML=
+          '<div class="mt-row"><div class="ml">'+m.heure+'</div><div class="ms '+scls+'">'+stxt+'</div></div>'+
+          '<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'+
+          html+
+          '<div style="display:flex;gap:6px;margin-top:6px">'+
+          (!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir r\u00e9sultat</button>':'')+
+          '<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">\u26a1 Analyser</button>'+
+          '<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">Sc\u00e9nario</button>'+
+          '</div>';
       }catch(e){
-        card.innerHTML='<div class="mt-row"><div class="ml">'+m.heure+'</div><div class="ms '+scls+'">'+stxt+'</div></div>'
-          +'<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'
-          +'<div style="font-size:.6rem;color:var(--r);padding:5px;font-family:var(--mono)">Erreur: '+e.message+'</div>'
-          +'<div style="display:flex;gap:6px;margin-top:6px">'
-          +(!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')
-          +'</div>';
+        card.innerHTML=
+          '<div class="mt-row"><div class="ml">'+m.heure+'</div></div>'+
+          '<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'+
+          '<div style="font-size:.6rem;color:var(--r);padding:4px;font-family:var(--mono)">Erreur: '+e.message+'</div>';
       }
       bodyDiv.appendChild(card);
     });
-    groupDiv.appendChild(headerDiv);groupDiv.appendChild(bodyDiv);list.appendChild(groupDiv);
+
+    groupDiv.appendChild(headerDiv);
+    groupDiv.appendChild(bodyDiv);
+    list.appendChild(groupDiv);
   });
-  // Afficher la barre expand/collapse
-  var bar=document.getElementById('tdExpandBar');if(bar)bar.style.display='flex';
-  // Auto-scroll vers le premier groupe live si présent
+
   var firstLive=list.querySelector('.mc.live');
   if(firstLive)setTimeout(function(){firstLive.scrollIntoView({behavior:'smooth',block:'center'})},200);
 }
-// ═══════════════════════════════════ SCÉNARIO MATCH ═══
+
+// Version optimisée de buildMatchHTML utilisant les caches pré-calculés
+function buildMatchHTMLFast(m,pred,s,res){
+  if(!pred)return'<div style="font-size:.7rem;color:var(--dm);padding:8px;background:var(--s2);border-radius:7px">Pas assez de donn\u00e9es</div>';
+
+  var hasCalib=window._hasCalib;
+  var calibBadge=hasCalib?'<span class="calib-badge cb-ok" style="margin-left:5px">CALIBR\u00c9</span>':'';
+  var convCls='conv-'+pred.convergence;
+
+  function sigBadge(lbl,val){
+    if(val===null)return'<span class="sig sig-d">'+lbl+': ?</span>';
+    var v=Math.round(val*100);
+    var cl=v>=60?'sig-g':v>=45?'sig-y':'sig-r';
+    return'<span class="sig '+cl+'">'+lbl+': '+v+'%</span>';
+  }
+
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+    '<div class="sig-row" style="margin:0;flex:1">'+sigBadge('L',pred.sigL)+sigBadge('H',pred.sigH)+sigBadge('J',pred.sigD)+calibBadge+'</div>'+
+    '<span class="conv-star '+convCls+'">'+pred.convergence+'/'+pred.nbSig+' \u26a1</span></div>';
+
+  var sa=pred.seuilAdapte;
+  if(sa!==null&&sa!==s)html+='<div style="font-size:.6rem;background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.18);border-radius:5px;padding:3px 7px;margin-bottom:6px;color:var(--y)">Seuil adapt\u00e9: +'+sa+' (moy '+pred.moyButs+' buts/match)</div>';
+
+  function mktBox(val,lbl){
+    if(val===null||val===undefined)return'<div class="mkt-box"><div class="mkt-val mv-d">?</div><div class="mkt-lbl">'+lbl+'</div></div>';
+    var v=Math.round(val*100);
+    var cl=v>=60?'mv-g':v>=45?'mv-y':'mv-r';
+    return'<div class="mkt-box"><div class="mkt-val '+cl+'">'+v+'%</div><div class="mkt-lbl">'+lbl+'</div></div>';
+  }
+
+  var ligS=pred.ligStats;
+  if(tdMkt==='auto'){
+    if(pred.bestMarket)html+='<div class="dominant-badge">\u2b50 '+pred.bestMarket.label+' \u2014 '+Math.round(pred.bestMarket.prob*100)+'%</div>';
+    html+='<div class="mkt-section"><div class="mkt-section-title">Totaux</div><div class="mkt-grid g4r">'+mktBox(pred.plus,'+'+s)+mktBox(pred.under,'-'+s)+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+'</div></div>';
+    html+='<div class="mkt-section"><div class="mkt-section-title">1X2 \u00b7 DC</div><div class="mkt-grid g6">'+mktBox(pred.v1,'Dom')+mktBox(pred.x,'Nul')+mktBox(pred.v2,'Ext')+mktBox(pred.dc1x,'DC1X')+mktBox(pred.dcx2,'DCX2')+mktBox(pred.dc12,'DC12')+'</div></div>';
+    html+='<div class="mkt-section"><div class="mkt-section-title">CS</div><div class="mkt-grid g4r">'+mktBox(pred.csH,'CS Dom')+mktBox(pred.csA,'CS Ext')+mktBox(pred.hmsc,'Dom Mq')+mktBox(pred.amsc,'Ext Mq')+'</div></div>';
+  } else if(tdMkt==='totaux'){
+    html+='<div class="mkt-section"><div class="mkt-section-title">Over/Under +'+s+'</div><div class="mkt-grid g4r">'+mktBox(pred.plus,'+'+s)+mktBox(pred.under,'-'+s)+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+'</div>';
+    if(ligS)html+='<div style="font-size:.58rem;color:var(--dm);margin-top:4px;font-family:var(--mono)">Ligue: Over '+ligS.over+'% \u00b7 Under '+ligS.under+'% \u00b7 Moy '+pred.moyButs+' buts</div>';
+    html+='</div>';
+  } else if(tdMkt==='v1x2'){
+    html+='<div class="mkt-section"><div class="mkt-section-title">1X2</div><div class="mkt-grid g3r">'+mktBox(pred.v1,'Domicile')+mktBox(pred.x,'Nul')+mktBox(pred.v2,'Ext\u00e9rieur')+'</div></div>';
+  } else if(tdMkt==='btts'){
+    html+='<div class="mkt-section"><div class="mkt-section-title">BTTS \u00b7 CS</div><div class="mkt-grid g4r">'+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+mktBox(pred.csH,'CS Dom')+mktBox(pred.csA,'CS Ext')+'</div></div>';
+  } else if(tdMkt==='dc'){
+    html+='<div class="mkt-section"><div class="mkt-section-title">Double Chance</div><div class="mkt-grid g3r">'+mktBox(pred.dc1x,'1X')+mktBox(pred.dcx2,'X2')+mktBox(pred.dc12,'12')+'</div></div>';
+  } else if(tdMkt==='cs'){
+    html+='<div class="mkt-section"><div class="mkt-section-title">CS</div><div class="mkt-grid g4r">'+mktBox(pred.csH,'CS Dom')+mktBox(pred.csA,'CS Ext')+mktBox(pred.hmsc,'Dom Mq')+mktBox(pred.amsc,'Ext Mq')+'</div></div>';
+  }
+
+  // Live badge
+  if(pred.liveActive){
+    html+='<div class="live-badge">\u27f3 RECALAGE LIVE';
+    if(pred.recalageSrc){
+      var src=pred.recalageSrc;
+      if(src.ligDone>0)html+=' \u00b7 Ligue: '+src.ligDone+' r\u00e9f.';
+      else if(src.hourDone>0)html+=' \u00b7 Heure: '+src.hourDone+' r\u00e9f.';
+      else if(src.globalDone>0)html+=' \u00b7 Global: '+src.globalDone+' r\u00e9f.';
+    }
+    html+='</div>';
+  }
+
+  // Badge 0-0 (utilise le cache pré-calculé)
+  var p00=compute00Badge(m,pred);
+  if(p00!==null&&p00>=15){
+    html+='<div class="badge-00'+(p00>=30?' hi':'')+'">&#x1F512; 0-0: '+p00+'%</div>';
+  }
+
+  // Value edge cotes
+  if(m._odds){
+    var edges=buildOddsEdges(m._odds,pred,s);
+    if(edges.length){
+      html+='<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">';
+      edges.slice(0,4).forEach(function(e){
+        if(e.edge<3)return;
+        var col=e.edge>=10?'var(--g)':e.edge>=5?'var(--y)':'var(--dm)';
+        html+='<span style="font-size:.55rem;font-family:var(--mono);padding:2px 6px;border-radius:4px;border:1px solid '+col+';color:'+col+'">'+e.label+' '+e.cote.toFixed(2)+(e.edge>=5?' +'+e.edge+'%':'')+'</span>';
+      });
+      html+='</div>';
+    }
+  }
+
+  html+='<div class="conf-bar" style="margin-top:7px"><div class="conf-track"><div class="conf-fill" style="width:'+pred.conf+'%;background:var(--g)"></div></div><span class="conf-lbl">Conf. '+pred.conf+'% \u00b7 '+pred.ligTotal+' hist.'+(pred.moyButs?' \u00b7 '+pred.moyButs+' buts/m':'')+'</span></div>';
+  return html;
+}
+
+
 function closeScenarioModal(e){if(e.target.id==='modalScenario')document.getElementById('modalScenario').classList.remove('on')}
 
 function openScenarioModal(idx){
@@ -3699,16 +3804,10 @@ function renderOddsStats(data){
     var vbUp=[];
     upcoming.filter(function(d){return d.pred;}).forEach(function(d){
       var p=d.pred;
-      [{label:'1',cote:d.c1,prob:p.v1},{label:'X',cote:d.cx,prob:p.x},{label:'2',cote:d.c2,prob:p.v2},
-       {label:'Over 2.5',cote:d.covPlus,prob:p.plus},{label:'Under 2.5',cote:d.covUnder,prob:p.under},
-       {label:'BTTS+',cote:d.cBttsY,prob:p.btts},{label:'BTTS-',cote:d.cBttsN,prob:p.bttsNon},
-       {label:'1X',cote:d.mkts['Double Chance']?d.mkts['Double Chance']['1X']:null,prob:(p.v1||0)+(p.x||0)},
-       {label:'X2',cote:d.mkts['Double Chance']?d.mkts['Double Chance']['X2']:null,prob:(p.x||0)+(p.v2||0)},
-       {label:'12',cote:d.mkts['Double Chance']?d.mkts['Double Chance']['12']:null,prob:(p.v1||0)+(p.v2||0)},
-      ].forEach(function(c){
+      getChecksForMkt(d, oddsMktActive).forEach(function(c){
         if(!c.cote||!c.prob||c.cote<=1)return;
         var edge=Math.round((c.prob-1/c.cote)*100*10)/10;
-        if(edge>=5)vbUp.push({match:d.match.home+' vs '+d.match.away,date:d.date,
+        if(edge>=oddsEdgeSeuil)vbUp.push({match:d.match.home+' vs '+d.match.away,date:d.date,
           label:c.label,cote:c.cote,predProb:Math.round(c.prob*100),edge:edge});
       });
     });
@@ -3750,14 +3849,10 @@ function renderOddsStats(data){
   var vbDone=[];
   terminated.filter(function(d){return d.pred;}).forEach(function(d){
     var p=d.pred,m=d.match;
-    [{label:'1',cote:d.c1,prob:p.v1,won:m.v1x2==='V1'},{label:'X',cote:d.cx,prob:p.x,won:m.v1x2==='X'},
-     {label:'2',cote:d.c2,prob:p.v2,won:m.v1x2==='V2'},{label:'Over 2.5',cote:d.covPlus,prob:p.plus,won:m.total>2.5},
-     {label:'Under 2.5',cote:d.covUnder,prob:p.under,won:m.total<=2.5},{label:'BTTS+',cote:d.cBttsY,prob:p.btts,won:m.btts===true},
-     {label:'BTTS-',cote:d.cBttsN,prob:p.bttsNon,won:m.btts===false},
-    ].forEach(function(c){
+    getChecksForMkt(d, oddsMktActive).forEach(function(c){
       if(!c.cote||!c.prob||c.cote<=1)return;
       var edge=Math.round((c.prob-1/c.cote)*100*10)/10;
-      if(edge>=5)vbDone.push({match:m.home+' vs '+m.away,date:d.date,
+      if(edge>=oddsEdgeSeuil)vbDone.push({match:m.home+' vs '+m.away,date:d.date,
         label:c.label,cote:c.cote,predProb:Math.round(c.prob*100),edge:edge,won:c.won});
     });
   });
@@ -3882,6 +3977,89 @@ function renderOddsStats(data){
 
   var out=document.getElementById('oddsOut');out.innerHTML=html;out.style.display='block';
   out.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+
+// ═══════════════════════════════════ ODDS FILTERS ═══
+var oddsEdgeSeuil=5;
+var oddsMktActive='all';
+
+function setEdgeSeuil(v){
+  oddsEdgeSeuil=v;
+  document.querySelectorAll('#edgeChips .chip').forEach(function(c){c.classList.toggle('on',parseInt(c.textContent)===v);});
+}
+function toggleOddsMktFilter(el,mkt){
+  oddsMktActive=mkt;
+  document.querySelectorAll('#oddsMktFilter .chip').forEach(function(c){c.classList.toggle('on',c.dataset.mkt===mkt);});
+}
+function getChecksForMkt(d,mktFilter){
+  var p=d.pred,m=d.match;
+  var all=[
+    {label:'1',cote:d.c1,prob:p?p.v1:null,won:m.v1x2==='V1',mkt:'1x2'},
+    {label:'X',cote:d.cx,prob:p?p.x:null,won:m.v1x2==='X',mkt:'1x2'},
+    {label:'2',cote:d.c2,prob:p?p.v2:null,won:m.v1x2==='V2',mkt:'1x2'},
+    {label:'Over 2.5',cote:d.covPlus,prob:p?p.plus:null,won:m.total!==null&&m.total>2.5,mkt:'ou'},
+    {label:'Under 2.5',cote:d.covUnder,prob:p?p.under:null,won:m.total!==null&&m.total<=2.5,mkt:'ou'},
+    {label:'BTTS+',cote:d.cBttsY,prob:p?p.btts:null,won:m.btts===true,mkt:'btts'},
+    {label:'BTTS-',cote:d.cBttsN,prob:p?p.bttsNon:null,won:m.btts===false,mkt:'btts'},
+    {label:'1X',cote:(d.mkts&&d.mkts['Double Chance'])?d.mkts['Double Chance']['1X']:null,prob:p?((p.v1||0)+(p.x||0)):null,won:m.v1x2==='V1'||m.v1x2==='X',mkt:'dc'},
+    {label:'X2',cote:(d.mkts&&d.mkts['Double Chance'])?d.mkts['Double Chance']['X2']:null,prob:p?((p.x||0)+(p.v2||0)):null,won:m.v1x2==='X'||m.v1x2==='V2',mkt:'dc'},
+    {label:'12',cote:(d.mkts&&d.mkts['Double Chance'])?d.mkts['Double Chance']['12']:null,prob:p?((p.v1||0)+(p.v2||0)):null,won:m.v1x2==='V1'||m.v1x2==='V2',mkt:'dc'},
+  ];
+  if(mktFilter==='all')return all;
+  return all.filter(function(c){return c.mkt===mktFilter;});
+}
+function buildEnrichedOddsData(odb,db,cache){
+  var data=[];
+  Object.keys(odb).forEach(function(fid){
+    var entry=odb[fid];
+    var dayMs=(db[entry.date]||[]);
+    var match=dayMs.find(function(m){return String(m.id)===String(fid)||(entry.homeTeam&&teamMatch(m.home,entry.homeTeam)&&teamMatch(m.away,entry.awayTeam));});
+    if(!match)return;
+    var pred=cache&&cache.total>0?predict(match,cache,seuilTd,null):null;
+    var terminated=TERM.indexOf(match.status)>=0&&match.h!==null;
+    var mkts=entry.markets||{};
+    var c1=null,cx=null,c2=null,covPlus=null,covUnder=null,cBttsY=null,cBttsN=null;
+    var m1x2=mkts['Match Winner']||mkts['1X2']||null;
+    if(m1x2){c1=m1x2['Home']||null;cx=m1x2['Draw']||null;c2=m1x2['Away']||null;}
+    var mOU=mkts['Goals Over/Under']||null;
+    if(mOU){Object.keys(mOU).forEach(function(k){
+      if(k==='Over 2.5'||k.indexOf('Over 2.5')>=0)covPlus=mOU[k];
+      if(k==='Under 2.5'||k.indexOf('Under 2.5')>=0)covUnder=mOU[k];
+    });}
+    var mBtts=mkts['Both Teams Score']||null;
+    if(mBtts){cBttsY=mBtts['Yes']||null;cBttsN=mBtts['No']||null;}
+    data.push({match:match,pred:pred,terminated:terminated,date:entry.date,
+               c1:c1,cx:cx,c2:c2,covPlus:covPlus,covUnder:covUnder,
+               cBttsY:cBttsY,cBttsN:cBttsN,marge:calcMarge(c1,cx,c2),mkts:mkts});
+  });
+  return data;
+}
+function exportValueBets(){
+  var odb=getOddsDB();
+  if(!Object.keys(odb).length){showAl('oddsAl','er','Aucune cote en base — Lance la collecte');return}
+  var db=getDB(),cache=window._predCache||buildCache();
+  var data=buildEnrichedOddsData(odb,db,cache);
+  var rows=[['\uFEFFDate','Match','March\u00e9','Cote','Pred%','Edge%','Termin\u00e9','R\u00e9sultat']];
+  data.forEach(function(d){
+    if(!d.pred)return;
+    var checks=getChecksForMkt(d,oddsMktActive);
+    checks.forEach(function(c){
+      if(!c.cote||!c.prob||c.cote<=1)return;
+      var edge=Math.round((c.prob-1/c.cote)*100*10)/10;
+      if(edge<oddsEdgeSeuil)return;
+      rows.push([d.date,d.match.home+' vs '+d.match.away,c.label,c.cote.toFixed(2),
+                 Math.round(c.prob*100)+'%','+'+edge+'%',
+                 d.terminated?'Oui':'Non',
+                 d.terminated?(c.won?'Gagn\u00e9':'Perdu'):'\u2014']);
+    });
+  });
+  if(rows.length<=1){showAl('oddsAl','er','Aucune value bet avec edge \u2265'+oddsEdgeSeuil+'%');return}
+  var csv=rows.map(function(r){return r.map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='value_bets_'+today()+'.csv';a.click();
+  showAl('oddsAl','ok',(rows.length-1)+' value bets export\u00e9es');
 }
 
 
@@ -4354,6 +4532,7 @@ function syncGlobal(){
   // Construire cache GLOBAL une seule fois (toutes les données historiques)
   var cache=buildCache();
   var track=getTrack();
+  var trackIdSet=new Set(track.map(function(t){return t.id;}));
   var added=0,skipped=0,processed=0;
   var total=candidates.length;
 
@@ -4373,7 +4552,7 @@ function syncGlobal(){
     var end=Math.min(idx+10,total);
     for(var i=idx;i<end;i++){
       var m=candidates[i];
-      var alreadyTracked=track.find(function(t){return t.id===m.id});
+      var alreadyTracked=trackIdSet.has(m.id)?track.find(function(t){return t.id===m.id}):null;
       if(alreadyTracked&&!overwrite){
         skipped++;
       } else {
@@ -4386,6 +4565,7 @@ function syncGlobal(){
           track[ti]=entry;
         } else {
           track.push(entry);
+          trackIdSet.add(m.id);
         }
         added++;
       }
