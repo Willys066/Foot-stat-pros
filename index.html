@@ -2847,22 +2847,25 @@ async function loadMatchs(source){
   fx.sort(function(a,b){var ca=a._pred?a._pred.convergence:-1,cb=b._pred?b._pred.convergence:-1;if(cb!==ca)return cb-ca;return(a.heure||'').localeCompare(b.heure||'')});
   allMatchsCache=fx; // TOUS les matchs sans filtre mode
   window._predCache=cache;
-  // Charger les cotes automatiquement si clé The Odds API configurée
-  if(cfg.oddsApiKey){
-    try{
-      var oddsEvts=await fetchOddsApi('soccer_'+getOddsSportKey(date),'h2h,totals,btts','decimal');
-      if(oddsEvts&&oddsEvts.length){
-        attachOddsToMatchs(fx, oddsEvts);
-        showAl('tdAl','ok',fx.length+' matchs chargés · cotes attachées ('+countWithOdds(fx)+' matchs)');
-      }
-    }catch(e){/* silencieux si pas de cote */}
-  }
   document.getElementById('tTot').textContent=fx.length;
   document.getElementById('tLiv').textContent=fx.filter(function(f){return LIVE.indexOf(f.status)>=0}).length;
   document.getElementById('tSoo').textContent=fx.filter(function(f){return TERM.indexOf(f.status)<0&&LIVE.indexOf(f.status)<0}).length;
   document.getElementById('tDon').textContent=fx.filter(function(f){return TERM.indexOf(f.status)>=0}).length;
   document.getElementById('tdSum').style.display='block';
-  renderMatchsList();
+  renderMatchsList(); // Afficher les matchs immédiatement
+  // Charger les cotes en arrière-plan APRÈS l'affichage
+  if(cfg.oddsApiKey){
+    setTimeout(async function(){
+      try{
+        var oddsEvts=await fetchOddsApi('soccer','h2h,totals,btts','decimal');
+        if(oddsEvts&&oddsEvts.length){
+          attachOddsToMatchs(fx,oddsEvts);
+          renderMatchsList(); // Rafraîchir avec les cotes
+          showAl('tdAl','ok',fx.length+' matchs · '+countWithOdds(fx)+' cotes attachées');
+        }
+      }catch(e){/* silencieux */}
+    },500);
+  }
 }
 function toggleAllGroups(open){
   document.querySelectorAll('.lg-body').forEach(function(b){b.classList.toggle('open',open)});
@@ -2870,6 +2873,8 @@ function toggleAllGroups(open){
 }
 function renderMatchsList(){
   window._matchRefs=[];var list=document.getElementById('tdList');list.innerHTML='';
+  // Pré-calculer stats 0-0 une seule fois (pas à chaque card)
+  window._00stats=get00Stats();
   // Appliquer recalage live si actif
   if(recalageActive){
     var liveCtxV2=buildLiveContextV2(allMatchsCache,seuilTd);
@@ -4085,7 +4090,7 @@ function get00Stats(){
 }
 // Calcule probabilité 0-0 pour badge sur match card
 function compute00Badge(m,pred){
-  var all=get00Stats();
+  var all=window._00stats||get00Stats();
   if(all.length<10)return null;
   // Base rate 0-0 globale
   var total=all.length,nb00=all.filter(function(x){return x.h===0&&x.a===0}).length;
