@@ -389,6 +389,7 @@ tr:hover td{background:var(--s2)}
 .sc-fiab-bar{height:4px;border-radius:2px;background:var(--s3);margin-top:4px;overflow:hidden}
 .sc-fiab-fill{height:100%;border-radius:2px}
 .badge-00{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:.58rem;font-weight:700;background:rgba(176,107,255,.1);border:1px solid rgba(176,107,255,.35);color:var(--p);font-family:var(--mono);margin-top:4px;margin-right:4px}
+.odds-edge-vb{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:.58rem;font-family:var(--mono);font-weight:700}
 .badge-00.hi{background:rgba(176,107,255,.2);border-color:rgba(176,107,255,.6)}
 /* WARN */
 .warn-banner{background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.25);border-radius:7px;padding:9px 12px;font-size:.66rem;color:var(--y);margin-bottom:10px;line-height:1.5;font-family:var(--mono)}
@@ -1054,6 +1055,8 @@ tr:hover td{background:var(--s2)}
 
   <!-- Stats cotes output -->
   <div id="oddsOut" style="display:none"></div>
+  <!-- Couplage prédictions / value bets -->
+  <div id="oddsAnalysisOut" style="display:none"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ FIABILITE ══ -->
@@ -2799,6 +2802,20 @@ function buildMatchHTML(m,pred,s){
   // Badge 0-0
   var p00=compute00Badge(m,pred);
   if(p00!==null){var c00=p00>=30?'hi':'';html+='<div class="badge-00 '+c00+'">&#x1F512; 0-0 : '+p00+'%</div>'}
+  // Value edge sur cotes attachées
+  if(m._odds){
+    var oddsEdges=buildOddsEdges(m._odds,pred,s);
+    if(oddsEdges.length){
+      html+='<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">';
+      oddsEdges.forEach(function(e){
+        var col=e.edge>=10?'var(--g)':e.edge>=5?'var(--y)':'var(--dm)';
+        var bg=e.edge>=10?'rgba(0,229,160,.1)':e.edge>=5?'rgba(255,199,44,.08)':'rgba(74,96,128,.08)';
+        html+='<span style="font-size:.58rem;font-family:var(--mono);padding:2px 7px;border-radius:5px;border:1px solid '+col+';background:'+bg+';color:'+col+'">';
+        html+=e.label+' '+e.cote.toFixed(2)+(e.edge>=5?' +'+e.edge+'%':'')+'</span>';
+      });
+      html+='</div>';
+    }
+  }
   html+='<div class="conf-bar" style="margin-top:7px"><div class="conf-track"><div class="conf-fill" style="width:'+pred.conf+'%;background:var(--g)"></div></div><span class="conf-lbl">Conf. '+pred.conf+'% · '+pred.ligTotal+' hist.'+(pred.moyButs?' · '+pred.moyButs+' buts/m':'')+'</span></div>';
   return html;
 }
@@ -2830,6 +2847,16 @@ async function loadMatchs(source){
   fx.sort(function(a,b){var ca=a._pred?a._pred.convergence:-1,cb=b._pred?b._pred.convergence:-1;if(cb!==ca)return cb-ca;return(a.heure||'').localeCompare(b.heure||'')});
   allMatchsCache=fx; // TOUS les matchs sans filtre mode
   window._predCache=cache;
+  // Charger les cotes automatiquement si clé The Odds API configurée
+  if(cfg.oddsApiKey){
+    try{
+      var oddsEvts=await fetchOddsApi('soccer_'+getOddsSportKey(date),'h2h,totals,btts','decimal');
+      if(oddsEvts&&oddsEvts.length){
+        attachOddsToMatchs(fx, oddsEvts);
+        showAl('tdAl','ok',fx.length+' matchs chargés · cotes attachées ('+countWithOdds(fx)+' matchs)');
+      }
+    }catch(e){/* silencieux si pas de cote */}
+  }
   document.getElementById('tTot').textContent=fx.length;
   document.getElementById('tLiv').textContent=fx.filter(function(f){return LIVE.indexOf(f.status)>=0}).length;
   document.getElementById('tSoo').textContent=fx.filter(function(f){return TERM.indexOf(f.status)<0&&LIVE.indexOf(f.status)<0}).length;
@@ -3200,17 +3227,19 @@ async function collectOddsGlobal(){
 
   try{
     // Step 1 : récupérer toutes les compétitions foot actives
-    var sportsResp=await fetch('https://api.the-odds-api.com/v4/sports/?apiKey='+encodeURIComponent(key)+'&all=false');
+    var sportsResp=await fetch('https://api.the-odds-api.com/v4/sports/?apiKey='+encodeURIComponent(key)+'&all=true');
     if(!sportsResp.ok){var t=await sportsResp.text();throw new Error('Sports API ('+sportsResp.status+'): '+t.substring(0,100));}
     var allSports=await sportsResp.json();
-    var soccerSports=allSports.filter(function(s){return s.group==='Soccer'&&s.active&&!s.has_outrights;});
-    if(!soccerSports.length){throw new Error('Aucune compétition foot active trouvée');}
+    // all=true : toutes les ligues soccer connues, pas seulement celles actives ce jour
+    // Les ligues sans matchs à venir retourneront [] et seront simplement ignorées
+    var soccerSports=allSports.filter(function(s){return s.group==='Soccer'&&!s.has_outrights;});
+    if(!soccerSports.length){throw new Error('Aucune compétition foot trouvée via The Odds API');}
 
     setOddsProgress('0 / '+soccerSports.length+' compétitions',0,'Effacement de l\'ancienne base...');
     // Clear old DB
     setOddsDB({});
     var odb={};
-    var totalFetched=0,done=0,errors=0;
+    var totalFetched=0,done=0,errors=0,skipped=0;
     var allEvents=[];
 
     // Step 2 : fetch chaque compétition séquentiellement (éviter rate limit)
@@ -3237,13 +3266,12 @@ async function collectOddsGlobal(){
           if(infoEl){infoEl.textContent='Quota : '+remaining+' req restantes ('+used+' utilisées)';infoEl.style.display='block';}
         }
         if(resp.status===401||resp.status===403){throw new Error('Clé API invalide ou quota dépassé');}
-        if(resp.status===422){done++;continue;} // no events for this sport
+        if(resp.status===422||resp.status===404){skipped++;done++;continue;} // no events for this sport
         if(!resp.ok){errors++;done++;continue;}
         var events=await resp.json();
         if(Array.isArray(events)&&events.length){
           events.forEach(function(ev){ev._sport=sport;});
           allEvents=allEvents.concat(events);
-          // Store immediately
           events.forEach(function(ev){
             var fid=ev.id;
             var homeTeam=ev.home_team||'?';
@@ -3255,28 +3283,36 @@ async function collectOddsGlobal(){
               odb[fid]={date:date,fixtureId:fid,homeTeam:homeTeam,awayTeam:awayTeam,
                         commenceTime:commenceTime,markets:markets,
                         sport:sport.key,sportTitle:sport.title||sport.key,
-                        sportGroup:sport.group||'Soccer',
                         source:'the-odds-api',fetchedAt:Date.now()};
               totalFetched++;
             }
           });
+        } else {
+          skipped++;
         }
         done++;
       }catch(err){
         if(err.message.indexOf('Clé API')>=0||err.message.indexOf('quota')>=0)throw err;
         errors++;done++;
       }
-      // Small delay to avoid hammering the API
-      await new Promise(function(r){setTimeout(r,120);});
+      await new Promise(function(r){setTimeout(r,80);});
     }
 
     setOddsDB(odb);
     prog.style.display='none';
     updateOddsSummary();
     renderCollectedOdds(allEvents, mkts);
-    var msg=totalFetched+' matchs collectés sur '+soccerSports.length+' compétitions';
-    if(errors)msg+=' ('+errors+' ignorées)';
+    var msg=totalFetched+' matchs · '+(done-skipped-errors)+' ligues actives';
+    if(skipped)msg+=' · '+skipped+' vides';
+    if(errors)msg+=' · '+errors+' erreurs';
     showAl('oddsAl','ok',msg);
+
+    // Auto-coupler avec les prédictions si la DB footstats a des données
+    var db=getDB();
+    var hasDB=Object.keys(db).length>0;
+    if(hasDB&&totalFetched>0){
+      setTimeout(function(){calcOddsStats();},400);
+    }
 
   }catch(e){
     document.getElementById('oddsGlobalProgress').style.display='none';
@@ -3552,180 +3588,287 @@ function calcOddsStats(){
   hideAl('oddsAl');
   renderOddsStats(enriched);
 }
+// Retourne le label de tranche pour une cote donnée
+function getBracketLabel(cote){
+  if(!cote)return '—';
+  if(cote<1.40)return '1.01–1.40';
+  if(cote<1.70)return '1.40–1.70';
+  if(cote<2.10)return '1.70–2.10';
+  if(cote<2.80)return '2.10–2.80';
+  if(cote<4.00)return '2.80–4.00';
+  return '4.00+';
+}
+
+function buildOddsEdges(odds,pred,s){
+  if(!odds||!pred)return[];
+  var edges=[];
+  var checks=[
+    {label:'1',cote:odds.c1,prob:pred.v1},
+    {label:'X',cote:odds.cx,prob:pred.x},
+    {label:'2',cote:odds.c2,prob:pred.v2},
+    {label:'O'+s,cote:odds.covPlus,prob:pred.plus},
+    {label:'U'+s,cote:odds.covUnder,prob:pred.under},
+    {label:'BTTS+',cote:odds.cBttsY,prob:pred.btts},
+    {label:'BTTS-',cote:odds.cBttsN,prob:pred.bttsNon},
+  ];
+  checks.forEach(function(c){
+    if(!c.cote||!c.prob||c.cote<=1)return;
+    var edge=Math.round((c.prob-1/c.cote)*100*10)/10;
+    edges.push({label:c.label,cote:c.cote,prob:c.prob,edge:edge});
+  });
+  edges.sort(function(a,b){return b.edge-a.edge});
+  return edges;
+}
+
+// Attache les cotes The Odds API aux matchs du jour
+function attachOddsToMatchs(matchs, oddsEvents){
+  if(!matchs||!oddsEvents)return;
+  oddsEvents.forEach(function(ev){
+    var homeTeam=ev.home_team||'';var awayTeam=ev.away_team||'';
+    var match=matchs.find(function(m){return teamMatch(m.home,homeTeam)&&teamMatch(m.away,awayTeam);});
+    if(!match)return;
+    var mkts=normalizeEventMarkets(ev,homeTeam,awayTeam,['h2h','totals','btts']);
+    var c1=null,cx=null,c2=null,covPlus=null,covUnder=null,cBttsY=null,cBttsN=null;
+    var m1x2=mkts['Match Winner']||mkts['1X2']||null;
+    if(m1x2){c1=m1x2['Home']||null;cx=m1x2['Draw']||null;c2=m1x2['Away']||null;}
+    var mOU=mkts['Goals Over/Under']||null;
+    if(mOU){
+      // Chercher Over/Under pour le seuil actuel et 2.5 par défaut
+      Object.keys(mOU).forEach(function(k){
+        if(k==='Over 2.5'||k.indexOf('Over 2.5')>=0)covPlus=mOU[k];
+        if(k==='Under 2.5'||k.indexOf('Under 2.5')>=0)covUnder=mOU[k];
+      });
+    }
+    var mBtts=mkts['Both Teams Score']||null;
+    if(mBtts){cBttsY=mBtts['Yes']||null;cBttsN=mBtts['No']||null;}
+    match._odds={c1:c1,cx:cx,c2:c2,covPlus:covPlus,covUnder:covUnder,
+                 cBttsY:cBttsY,cBttsN:cBttsN,
+                 marge:calcMarge(c1,cx,c2),
+                 raw:mkts,source:'the-odds-api',fetchedAt:Date.now()};
+    // Stocker aussi dans oddsDB pour stats futures
+    var odb=getOddsDB();
+    odb[match.id||ev.id]={date:match.date||ev.commence_time.split('T')[0],
+      fixtureId:match.id||ev.id,homeTeam:homeTeam,awayTeam:awayTeam,
+      commenceTime:ev.commence_time,markets:mkts,source:'the-odds-api',fetchedAt:Date.now()};
+    setOddsDB(odb);
+  });
+}
+
+function countWithOdds(matchs){return matchs.filter(function(m){return m._odds;}).length;}
+
+function getOddsSportKey(date){return 'soccer';} // simple, all soccer
+
 function renderOddsStats(data){
+  // Séparer terminés / à venir
   var terminated=data.filter(function(d){return d.terminated&&d.match.h!==null;});
+  var upcoming=data.filter(function(d){return !d.terminated;});
   var withPred=data.filter(function(d){return d.pred;});
   var html='';
 
-  // ── Résumé ──
+  // ── Résumé global ──
   html+='<div class="card">';
   html+='<div class="sg g3" style="margin-bottom:10px">';
-  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+data.length+'</div><div class="sl">Matchs</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+data.length+'</div><div class="sl">Total</div></div>';
   html+='<div class="sb"><div class="sv" style="color:var(--g)">'+terminated.length+'</div><div class="sl">Termin\u00e9s</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--y)">'+withPred.length+'</div><div class="sl">Avec pred.</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--y)">'+upcoming.length+'</div><div class="sl">\u00c0 venir</div></div>';
   html+='</div>';
-
-  // Marge moyenne bookie
   var marges=data.filter(function(d){return d.marge!==null;}).map(function(d){return d.marge;});
   if(marges.length){
-    var avgMarge=Math.round(marges.reduce(function(a,b){return a+b},0)/marges.length*10)/10;
-    html+='<div style="font-size:.72rem;color:var(--dm);font-family:var(--mono)">Marge bookmaker moyenne : <span style="color:var(--r);font-weight:700">'+avgMarge+'%</span></div>';
+    var avgM=Math.round(marges.reduce(function(a,b){return a+b},0)/marges.length*10)/10;
+    html+='<div style="font-size:.7rem;color:var(--dm);font-family:var(--mono)">Marge bookie moyenne : <span style="color:var(--r);font-weight:700">'+avgM+'%</span></div>';
   }
   html+='</div>';
 
-  // ── Value Bets ──
-  if(withPred.length){
-    html+='<div class="st" style="margin:12px 0 8px">&#x1F4B0; Value Bets d\u00e9tect\u00e9es</div>';
-    html+='<div class="card">';
-    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Edge positif = FootStats pr\u00e9dit plus que le bookmaker. Seuil : edge &gt;5%</div>';
-    var valueBets=[];
-    withPred.forEach(function(d){
+  // ── VALUE BETS À VENIR (prédiction en attente) ──
+  if(upcoming.filter(function(d){return d.pred;}).length){
+    var vbUp=[];
+    upcoming.filter(function(d){return d.pred;}).forEach(function(d){
       var p=d.pred;
-      if(!p)return;
-      var checks=[
-        {label:'1 ('+d.match.home+')',cote:d.c1,prob:p.v1,mkt:'1X2'},
-        {label:'X',cote:d.cx,prob:p.x,mkt:'1X2'},
-        {label:'2 ('+d.match.away+')',cote:d.c2,prob:p.v2,mkt:'1X2'},
-        {label:'Over 2.5',cote:d.covPlus,prob:p.plus,mkt:'OU'},
-        {label:'Under 2.5',cote:d.covUnder,prob:p.under,mkt:'OU'},
-        {label:'BTTS Oui',cote:d.cBttsY,prob:p.btts,mkt:'BTTS'},
-        {label:'BTTS Non',cote:d.cBttsN,prob:p.bttsNon,mkt:'BTTS'},
-      ];
-      checks.forEach(function(c){
-        var edge=valueEdge(c.prob,c.cote);
-        if(edge===null)return;
-        if(edge>=5){
-          var won=null;
-          if(d.terminated){
-            if(c.mkt==='1X2'&&c.label.indexOf('1 (')===0)won=d.match.v1x2==='V1';
-            else if(c.mkt==='1X2'&&c.label==='X')won=d.match.v1x2==='X';
-            else if(c.mkt==='1X2'&&c.label.indexOf('2 (')===0)won=d.match.v1x2==='V2';
-            else if(c.label==='Over 2.5')won=d.match.total>2.5;
-            else if(c.label==='Under 2.5')won=d.match.total<=2.5;
-            else if(c.label==='BTTS Oui')won=d.match.btts;
-            else if(c.label==='BTTS Non')won=!d.match.btts;
-          }
-          valueBets.push({match:d.match.home+' vs '+d.match.away,date:d.date,
-                          label:c.label,cote:c.cote,predProb:Math.round((c.prob||0)*100),
-                          edge:edge,won:won});
-        }
+      [{label:'1',cote:d.c1,prob:p.v1},{label:'X',cote:d.cx,prob:p.x},{label:'2',cote:d.c2,prob:p.v2},
+       {label:'Over 2.5',cote:d.covPlus,prob:p.plus},{label:'Under 2.5',cote:d.covUnder,prob:p.under},
+       {label:'BTTS+',cote:d.cBttsY,prob:p.btts},{label:'BTTS-',cote:d.cBttsN,prob:p.bttsNon},
+       {label:'1X',cote:d.mkts['Double Chance']?d.mkts['Double Chance']['1X']:null,prob:(p.v1||0)+(p.x||0)},
+       {label:'X2',cote:d.mkts['Double Chance']?d.mkts['Double Chance']['X2']:null,prob:(p.x||0)+(p.v2||0)},
+       {label:'12',cote:d.mkts['Double Chance']?d.mkts['Double Chance']['12']:null,prob:(p.v1||0)+(p.v2||0)},
+      ].forEach(function(c){
+        if(!c.cote||!c.prob||c.cote<=1)return;
+        var edge=Math.round((c.prob-1/c.cote)*100*10)/10;
+        if(edge>=5)vbUp.push({match:d.match.home+' vs '+d.match.away,date:d.date,
+          label:c.label,cote:c.cote,predProb:Math.round(c.prob*100),edge:edge});
       });
     });
-    valueBets.sort(function(a,b){return b.edge-a.edge});
-    if(valueBets.length){
-      html+='<div class="tbl"><table><thead><tr><th>Match</th><th>Pari</th><th>Cote</th><th>Pred%</th><th>Edge</th><th>R\u00e9sultat</th></tr></thead><tbody>';
-      valueBets.slice(0,20).forEach(function(v){
-        var resCol=v.won===null?'':v.won?'tg':'tr';
-        var resTxt=v.won===null?'—':v.won?'✅':'❌';
-        html+='<tr><td style="font-size:.58rem">'+v.match.substring(0,20)+'<br><span style="color:var(--dm)">'+v.date+'</span></td>';
-        html+='<td>'+v.label+'</td><td style="color:var(--y);font-weight:700">'+v.cote+'</td>';
-        html+='<td>'+v.predProb+'%</td><td class="tg">+'+v.edge+'%</td><td class="'+resCol+'">'+resTxt+'</td></tr>';
+    vbUp.sort(function(a,b){return b.edge-a.edge;});
+    html+='<div class="st" style="margin:10px 0 8px">&#x1F52E; Value Bets \u00e0 venir</div>';
+    html+='<div class="card">';
+    if(vbUp.length){
+      html+='<div class="tbl"><table><thead><tr><th>Match</th><th>Pari</th><th>Cote</th><th>Pred%</th><th>Edge</th></tr></thead><tbody>';
+      vbUp.slice(0,25).forEach(function(v){
+        html+='<tr><td style="font-size:.58rem">'+v.match.substring(0,22)+'<br><span style="color:var(--dm)">'+v.date+'</span></td>';
+        html+='<td>'+v.label+'</td><td style="color:var(--y);font-weight:700">'+v.cote.toFixed(2)+'</td>';
+        html+='<td>'+v.predProb+'%</td><td class="tg">+'+v.edge+'%</td></tr>';
       });
       html+='</tbody></table></div>';
-      // ROI value bets
-      var vbTerminated=valueBets.filter(function(v){return v.won!==null});
-      if(vbTerminated.length){
-        var wins=vbTerminated.filter(function(v){return v.won}).length;
-        var roi=vbTerminated.reduce(function(acc,v){return acc+(v.won?(v.cote-1):-1)},0);
-        var roiPct=Math.round(roi/vbTerminated.length*100);
-        html+='<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:7px;font-size:.68rem;font-family:var(--mono)">';
-        html+='Sur '+vbTerminated.length+' value bets termin\u00e9es : '+wins+' gagn\u00e9es · ROI : <span style="color:'+(roiPct>=0?'var(--g)':'var(--r)')+'">'+( roiPct>=0?'+':'')+roiPct+'%</span></div>';
-      }
     } else {
-      html+='<div style="font-size:.68rem;color:var(--dm);font-family:var(--mono)">Aucune value bet avec edge &gt;5% d\u00e9tect\u00e9e.</div>';
+      html+='<div style="font-size:.68rem;color:var(--dm);font-family:var(--mono)">Aucune value bet &gt;5% sur les matchs \u00e0 venir.</div>';
     }
     html+='</div>';
   }
 
-  // ── ROI par tranche de cote ──
-  if(terminated.length>=5){
-    html+='<div class="st" style="margin:12px 0 8px">&#x1F4C8; ROI par tranche de cote</div>';
-    html+='<div class="card">';
-    var tranches=[
-      {min:1.01,max:1.40,label:'1.01–1.40'},
-      {min:1.40,max:1.70,label:'1.40–1.70'},
-      {min:1.70,max:2.10,label:'1.70–2.10'},
-      {min:2.10,max:2.80,label:'2.10–2.80'},
-      {min:2.80,max:4.00,label:'2.80–4.00'},
-      {min:4.00,max:99,label:'4.00+'},
-    ];
-    // Collecter tous les paris terminés avec cote + résultat
-    var allBets=[];
-    terminated.forEach(function(d){
-      var checks=[
-        {cote:d.c1,won:d.match.v1x2==='V1'},
-        {cote:d.cx,won:d.match.v1x2==='X'},
-        {cote:d.c2,won:d.match.v1x2==='V2'},
-        {cote:d.covPlus,won:d.match.total>2.5},
-        {cote:d.covUnder,won:d.match.total<=2.5},
-        {cote:d.cBttsY,won:d.match.btts===true},
-        {cote:d.cBttsN,won:d.match.btts===false},
-      ];
-      checks.forEach(function(c){if(c.cote&&c.cote>1)allBets.push(c);});
+  // ── STATS HISTORIQUES (terminés uniquement) ──
+  if(terminated.length<3){
+    html+='<div class="card" style="opacity:.6"><div style="font-size:.7rem;color:var(--dm);text-align:center;padding:10px">Pas assez de matchs termin\u00e9s pour les stats ('+terminated.length+'/3 minimum)</div></div>';
+    var out=document.getElementById('oddsOut');out.innerHTML=html;out.style.display='block';
+    return;
+  }
+
+  // Construire liste de tous les paris terminés
+  var allBets=[];
+  terminated.forEach(function(d){
+    var m=d.match;
+    [{cote:d.c1,won:m.v1x2==='V1',label:'1X2-1'},{cote:d.cx,won:m.v1x2==='X',label:'1X2-X'},{cote:d.c2,won:m.v1x2==='V2',label:'1X2-2'},
+     {cote:d.covPlus,won:m.total!==null&&m.total>2.5,label:'Over 2.5'},{cote:d.covUnder,won:m.total!==null&&m.total<=2.5,label:'Under 2.5'},
+     {cote:d.cBttsY,won:m.btts===true,label:'BTTS+'},{cote:d.cBttsN,won:m.btts===false,label:'BTTS-'},
+    ].forEach(function(b){if(b.cote&&b.cote>1)allBets.push(b);});
+  });
+
+  // ── VALUE BETS RÉALISÉES (edge + résultat) ──
+  var vbDone=[];
+  terminated.filter(function(d){return d.pred;}).forEach(function(d){
+    var p=d.pred,m=d.match;
+    [{label:'1',cote:d.c1,prob:p.v1,won:m.v1x2==='V1'},{label:'X',cote:d.cx,prob:p.x,won:m.v1x2==='X'},
+     {label:'2',cote:d.c2,prob:p.v2,won:m.v1x2==='V2'},{label:'Over 2.5',cote:d.covPlus,prob:p.plus,won:m.total>2.5},
+     {label:'Under 2.5',cote:d.covUnder,prob:p.under,won:m.total<=2.5},{label:'BTTS+',cote:d.cBttsY,prob:p.btts,won:m.btts===true},
+     {label:'BTTS-',cote:d.cBttsN,prob:p.bttsNon,won:m.btts===false},
+    ].forEach(function(c){
+      if(!c.cote||!c.prob||c.cote<=1)return;
+      var edge=Math.round((c.prob-1/c.cote)*100*10)/10;
+      if(edge>=5)vbDone.push({match:m.home+' vs '+m.away,date:d.date,
+        label:c.label,cote:c.cote,predProb:Math.round(c.prob*100),edge:edge,won:c.won});
     });
-    html+='<div class="tbl"><table><thead><tr><th>Tranche</th><th>Paris</th><th>Gagnants</th><th>Taux r\u00e9el</th><th>Taux impl.</th><th>ROI</th></tr></thead><tbody>';
-    tranches.forEach(function(tr){
-      var bets=allBets.filter(function(b){return b.cote>=tr.min&&b.cote<tr.max;});
-      if(!bets.length)return;
-      var wins=bets.filter(function(b){return b.won;}).length;
-      var realRate=Math.round(wins/bets.length*100);
-      var avgCote=Math.round(bets.reduce(function(a,b){return a+b.cote;},0)/bets.length*100)/100;
-      var impliedRate=Math.round(100/avgCote);
-      var roi=Math.round((bets.reduce(function(acc,b){return acc+(b.won?(b.cote-1):-1);},0)/bets.length)*100);
-      var roiCol=roi>=0?'tg':'tr';
-      var diffRate=realRate-impliedRate;
-      var diffCol=diffRate>3?'tg':diffRate<-3?'tr':'';
-      html+='<tr><td>'+tr.label+'</td><td>'+bets.length+'</td><td>'+wins+'</td>';
-      html+='<td class="'+diffCol+'">'+realRate+'%</td><td>'+impliedRate+'%</td>';
-      html+='<td class="'+roiCol+'">'+(roi>=0?'+':'')+roi+'%</td></tr>';
+  });
+  if(vbDone.length){
+    html+='<div class="st" style="margin:10px 0 8px">&#x2705; Value Bets termin\u00e9es</div>';
+    html+='<div class="card">';
+    var wins=vbDone.filter(function(v){return v.won;}).length;
+    var roi=vbDone.reduce(function(acc,v){return acc+(v.won?(v.cote-1):-1);},0);
+    var roiPct=Math.round(roi/vbDone.length*100);
+    html+='<div class="sg g3" style="margin-bottom:10px">';
+    html+='<div class="sb"><div class="sv" style="color:var(--b)">'+vbDone.length+'</div><div class="sl">VB jou\u00e9es</div></div>';
+    html+='<div class="sb"><div class="sv" style="color:var(--g)">'+wins+'</div><div class="sl">Gagn\u00e9es</div></div>';
+    html+='<div class="sb"><div class="sv" style="color:'+(roiPct>=0?'var(--g)':'var(--r)')+'">'+( roiPct>=0?'+':'')+roiPct+'%</div><div class="sl">ROI</div></div>';
+    html+='</div>';
+    html+='<div class="tbl"><table><thead><tr><th>Match</th><th>Pari</th><th>Cote</th><th>Edge</th><th>R\u00e9sultat</th></tr></thead><tbody>';
+    vbDone.forEach(function(v){
+      html+='<tr><td style="font-size:.58rem">'+v.match.substring(0,20)+'<br><span style="color:var(--dm)">'+v.date+'</span></td>';
+      html+='<td>'+v.label+'</td><td style="color:var(--y);font-weight:700">'+v.cote.toFixed(2)+'</td>';
+      html+='<td class="tg">+'+v.edge+'%</td><td class="'+(v.won?'tg':'tr')+'">'+(v.won?'\u2705':'\u274c')+'</td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+
+  // ── ROI PAR TRANCHE FINE (paliers 0.10) ──
+  html+='<div class="st" style="margin:10px 0 8px">&#x1F4C8; ROI par tranche de cote</div>';
+  html+='<div class="card">';
+  var fineMap={};
+  allBets.forEach(function(b){
+    var t=Math.floor(b.cote*10)/10; // palier 0.10
+    var k=t.toFixed(1);
+    if(!fineMap[k])fineMap[k]={total:0,wins:0,cotes:[]};
+    fineMap[k].total++;fineMap[k].cotes.push(b.cote);
+    if(b.won)fineMap[k].wins++;
+  });
+  var fineBrackets=Object.keys(fineMap).map(parseFloat).sort(function(a,b){return a-b;});
+  // Regrouper par tranches de 0.30 pour lisibilité si trop granulaire
+  var grouped={};
+  fineBrackets.forEach(function(t){
+    var gKey=t<1.5?'1.01\u20131.50':t<1.8?'1.50\u20131.80':t<2.1?'1.80\u20132.10':t<2.5?'2.10\u20132.50':t<3.0?'2.50\u20133.00':t<4.0?'3.00\u20134.00':'4.00+';
+    if(!grouped[gKey])grouped[gKey]={total:0,wins:0,sumCote:0};
+    var bk=fineMap[t.toFixed(1)];
+    grouped[gKey].total+=bk.total;grouped[gKey].wins+=bk.wins;
+    grouped[gKey].sumCote+=bk.cotes.reduce(function(a,b){return a+b},0);
+  });
+  html+='<div class="tbl"><table><thead><tr><th>Tranche</th><th>Paris</th><th>Gagn\u00e9s</th><th>Taux r\u00e9el</th><th>Taux impl.</th><th>ROI</th></tr></thead><tbody>';
+  var orderedKeys=['1.01\u20131.50','1.50\u20131.80','1.80\u20132.10','2.10\u20132.50','2.50\u20133.00','3.00\u20134.00','4.00+'];
+  orderedKeys.forEach(function(gk){
+    var g=grouped[gk];if(!g||g.total<2)return;
+    var realRate=Math.round(g.wins/g.total*100);
+    var avgCote=g.sumCote/g.total;
+    var implRate=Math.round(100/avgCote);
+    var roi=Math.round((g.wins*avgCote-g.total)/g.total*100);
+    var diff=realRate-implRate;
+    html+='<tr><td>'+gk+'</td><td>'+g.total+'</td><td>'+g.wins+'</td>';
+    html+='<td class="'+(diff>3?'tg':diff<-3?'tr':'')+'">'+realRate+'%</td>';
+    html+='<td>~'+implRate+'%</td>';
+    html+='<td class="'+(roi>=0?'tg':'tr')+'">'+(roi>=0?'+':'')+roi+'%</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='</div>';
+
+  // ── COTES NORMALES (paliers bookmaker ±0.05) ──
+  html+='<div class="st" style="margin:10px 0 8px">&#x1F3AF; Cotes normales — paliers bookmakers</div>';
+  html+='<div class="card">';
+  html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Paliers fr\u00e9quents (\u00b10.05) : taux de r\u00e9alisation r\u00e9el vs probabilit\u00e9 implicite.</div>';
+  var normalPaliers=[1.20,1.25,1.30,1.33,1.40,1.44,1.50,1.57,1.60,1.65,1.70,1.75,1.80,1.85,1.90,1.95,2.00,2.05,2.10,2.20,2.25,2.30,2.40,2.50,2.60,2.75,2.80,3.00,3.25,3.50,4.00,4.50,5.00,6.00];
+  var palierData=[];
+  normalPaliers.forEach(function(p){
+    var bets=allBets.filter(function(b){return Math.abs(b.cote-p)<=0.05;});
+    if(bets.length<2)return;
+    var wins=bets.filter(function(b){return b.won;}).length;
+    var realRate=Math.round(wins/bets.length*100);
+    var implRate=Math.round(100/p);
+    var diff=realRate-implRate;
+    var roi=Math.round((bets.reduce(function(acc,b){return acc+(b.won?(b.cote-1):-1);},0))/bets.length*100);
+    palierData.push({p:p,total:bets.length,wins:wins,realRate:realRate,implRate:implRate,diff:diff,roi:roi});
+  });
+  if(palierData.length){
+    html+='<div class="tbl"><table><thead><tr><th>Cote</th><th>Paris</th><th>R\u00e9el%</th><th>Impl.%</th><th>\u0394</th><th>ROI</th></tr></thead><tbody>';
+    palierData.forEach(function(pd){
+      html+='<tr><td style="font-weight:700;color:var(--y)">'+pd.p.toFixed(2)+'</td>';
+      html+='<td>'+pd.total+'</td><td class="'+(pd.diff>3?'tg':pd.diff<-3?'tr':'')+'">'+pd.realRate+'%</td>';
+      html+='<td>'+pd.implRate+'%</td><td class="'+(pd.diff>3?'tg':pd.diff<-3?'tr':'')+'">'+( pd.diff>0?'+':'')+pd.diff+'%</td>';
+      html+='<td class="'+(pd.roi>=0?'tg':'tr')+'">'+(pd.roi>=0?'+':'')+pd.roi+'%</td></tr>';
     });
     html+='</tbody></table></div>';
-    html+='<div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:6px;line-height:1.5">Taux impl. = ce que la cote moyenne implique · Taux r\u00e9el = ce qui s\'est pass\u00e9 · ROI = retour sur mise</div>';
-    html+='</div>';
+    // Top 3 paliers les plus rentables
+    var topPaliers=palierData.filter(function(p){return p.total>=3;}).sort(function(a,b){return b.roi-a.roi;}).slice(0,3);
+    if(topPaliers.length){
+      html+='<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:7px;font-size:.68rem;font-family:var(--mono)">';
+      html+='&#x1F3C6; Paliers les plus rentables : ';
+      html+=topPaliers.map(function(p){return'<span style="color:var(--g)">'+p.p.toFixed(2)+' (ROI '+(p.roi>0?'+':'')+p.roi+'%)</span>';}).join(' · ');
+      html+='</div>';
+    }
+  } else {
+    html+='<div style="font-size:.68rem;color:var(--dm);font-family:var(--mono)">Pas assez de donn\u00e9es sur les paliers standard.</div>';
   }
+  html+='</div>';
 
-  // ── Taux de réalisation par cote ──
-  if(terminated.length>=5){
-    html+='<div class="st" style="margin:12px 0 8px">&#x1F3AF; Calibration bookmaker</div>';
-    html+='<div class="card">';
-    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Comparaison probabilit\u00e9 implicite bookmaker vs taux de r\u00e9alisation r\u00e9el. Un \u00e9cart persistant = edge exploitable.</div>';
-    var brackets=[10,20,30,40,50,60,70,80,90];
-    var buckMap={};
-    brackets.forEach(function(b){buckMap[b]={total:0,won:0};});
-    terminated.forEach(function(d){
-      var checks=[
-        {cote:d.c1,won:d.match.v1x2==='V1'},
-        {cote:d.cx,won:d.match.v1x2==='X'},
-        {cote:d.c2,won:d.match.v1x2==='V2'},
-      ];
-      checks.forEach(function(c){
-        if(!c.cote||c.cote<=1)return;
-        var implP=Math.round(100/c.cote/10)*10;
-        if(buckMap[implP]){buckMap[implP].total++;if(c.won)buckMap[implP].won++;}
-      });
-    });
-    html+='<div class="bars">';
-    brackets.forEach(function(b){
-      var bk=buckMap[b];if(!bk||bk.total<3)return;
-      var realP=Math.round(bk.won/bk.total*100);
-      var diff=realP-b;
-      var col=diff>5?'var(--g)':diff<-5?'var(--r)':'var(--y)';
-      html+='<div class="br2"><div class="bn" style="width:36px">~'+b+'%</div><div class="bb2">';
-      html+='<div class="bf" style="width:'+Math.min(100,realP)+'%;background:'+col+'">Réel: '+realP+'% ('+bk.won+'/'+bk.total+', '+(diff>0?'+':'')+diff+'%)</div>';
-      html+='</div></div>';
-    });
+  // ── CALIBRATION BOOKMAKER ──
+  html+='<div class="st" style="margin:10px 0 8px">&#x1F4CA; Calibration bookmaker</div>';
+  html+='<div class="card">';
+  var buckets={};
+  for(var b=5;b<=95;b+=5)buckets[b]={total:0,wins:0};
+  allBets.forEach(function(bet){
+    if(!bet.cote||bet.cote<=1)return;
+    var impl=Math.round(100/bet.cote/5)*5;
+    impl=Math.max(5,Math.min(95,impl));
+    if(buckets[impl]){buckets[impl].total++;if(bet.won)buckets[impl].wins++;}
+  });
+  html+='<div class="bars">';
+  Object.keys(buckets).sort(function(a,b){return a-b;}).forEach(function(b){
+    var bk=buckets[b];if(bk.total<3)return;
+    var realP=Math.round(bk.wins/bk.total*100);
+    var diff=realP-parseInt(b);
+    var col=diff>5?'var(--g)':diff<-5?'var(--r)':'var(--y)';
+    html+='<div class="br2"><div class="bn" style="width:34px">~'+b+'%</div><div class="bb2">';
+    html+='<div class="bf" style="width:'+Math.min(100,realP)+'%;background:'+col+'">R\u00e9el: '+realP+'% ('+bk.wins+'/'+bk.total+', '+(diff>0?'+':'')+diff+'%)</div>';
     html+='</div></div>';
-  }
+  });
+  html+='</div></div>';
 
-  var out=document.getElementById('oddsOut');
-  out.innerHTML=html;out.style.display='block';
+  var out=document.getElementById('oddsOut');out.innerHTML=html;out.style.display='block';
+  out.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-
-// ═══════════════════════════════════ RECALAGE LIVE ═══
-var recalageActive=false;
-var RECALAGE_WEIGHTS={lig:0.55,hour:0.30,global:0.15};
-var RECALAGE_KEY='fs_recalage_weights';
 
 function loadRecalageWeights(){try{var w=JSON.parse(localStorage.getItem(RECALAGE_KEY));if(w)RECALAGE_WEIGHTS=w;}catch(e){}}
 function saveRecalageWeights(w){RECALAGE_WEIGHTS=w;localStorage.setItem(RECALAGE_KEY,JSON.stringify(w));}
