@@ -2893,7 +2893,17 @@ function renderMatchsList(){
   var fx=modeFiltered.filter(function(m){if(convFilterVal===0)return true;return(m._pred?m._pred.convergence:0)>=convFilterVal});
   if(!fx.length){list.innerHTML='<div style="text-align:center;color:var(--dm);padding:30px;font-size:.8rem">Aucun match. Baisse la convergence minimum.</div>';return}
   var results=getRes(),track=getTrack();
-  fx.forEach(function(m){if(TERM.indexOf(m.status)>=0&&m.h!==null&&m.a!==null&&m._pred&&!track.find(function(t){return t.id===m.id})){track.push(buildTrackEntry(m,m._pred,seuilTd,m.h,m.a));setTrack(track)}});
+  // Build trackId set once for O(1) lookup instead of O(n) find per match
+  var trackIds=new Set(track.map(function(t){return t.id;}));
+  var trackDirty=false;
+  fx.forEach(function(m){
+    if(TERM.indexOf(m.status)>=0&&m.h!==null&&m.a!==null&&m._pred&&!trackIds.has(m.id)){
+      track.push(buildTrackEntry(m,m._pred,seuilTd,m.h,m.a));
+      trackIds.add(m.id);
+      trackDirty=true;
+    }
+  });
+  if(trackDirty)setTrack(track); // write localStorage ONCE at end
   var groups={};
   fx.forEach(function(m){var k=m.league+'|||'+m.country;if(!groups[k])groups[k]={league:m.league,country:m.country,matchs:[]};groups[k].matchs.push(m)});
   Object.keys(groups).forEach(function(gk){
