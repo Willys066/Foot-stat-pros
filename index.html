@@ -1205,7 +1205,7 @@ tr:hover td{background:var(--s2)}
 var DB_KEY='fsa_db_v5',CFG_KEY='fsa_cfg_v6',RES_KEY='fsa_res_v1',TRACK_KEY='fsa_track_v2',TK_KEY='fsa_tickets_v1',CALIB_KEY='fsa_calib_v1',AN_KEY='btts_h_v1';
 var PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?'];
 var API='https://v3.football.api-sports.io';
-var TERM=['FT','AET','PEN','AWD','WO'],LIVE=['1H','HT','2H','ET','BT','P','INT','LIVE'];
+var TERM=['FT','AET','PEN','AWD','WO','CANC','ABD','SUSP','PST'],LIVE=['1H','HT','2H','ET','BT','P','INT','LIVE'];
 var seuil=2.5,seuilSt=2.5,seuilTd=2.5,seuilComp=2.5,seuilFiab=2.5,seuilTk=2.5;
 var convFilterVal=0,convTkVal=1,compSort='plus',compData=[];
 var stopFlag=false,modalMatch=null,currentTickets=[],modalTkIdx=-1;
@@ -1859,13 +1859,23 @@ async function lancer(force){
     var date=dates[i],pct=Math.round(i/dates.length*100);
     document.getElementById('colFill').style.width=pct+'%';document.getElementById('colMsg').textContent='Collecte... '+pct+'%';document.getElementById('colSub').textContent=date+' ('+(i+1)+'/'+dates.length+')';
     var isToday=(date===today());
-    if(!force&&!isToday&&db[date]&&db[date].length>0){addLog('Déjà en base: '+date+' ('+db[date].length+' matchs)');j++;m+=db[date].length;setS();continue}
+    var isYesterday=(date===nAgo(1));
+    var isRecent=isToday||isYesterday;
+    var hasStaleData=!isToday&&db[date]&&db[date].length>0&&db[date].some(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0&&m.status!==''});
+    if(!force&&!isRecent&&!hasStaleData&&db[date]&&db[date].length>0){addLog('Déjà en base: '+date+' ('+db[date].length+' matchs)');j++;m+=db[date].length;setS();continue}
+    if(hasStaleData&&!force&&!isRecent){addLog('\u26a0 Statuts périmés: '+date+' \u2014 re-collecte...','var(--y)')}
     r++;var data2=await apiCall('/fixtures',{date:date});
     if(!data2){e++;addLog('Erreur API: '+date,'var(--r)')}
     else{
       var allFx=data2.response||[],ms;
-      if(isToday){ms=allFx.map(function(f){return parseFix(f,tz)});addLog(date+' - '+ms.length+' matchs','var(--g)')}
-      else{ms=allFx.filter(function(f){return TERM.indexOf(f.fixture&&f.fixture.status?f.fixture.status.short:'')>=0}).map(function(f){return parseFix(f,tz)});addLog(date+' - '+ms.length+' terminés','var(--g)')}
+      if(isToday){
+        ms=allFx.map(function(f){return parseFix(f,tz)});
+        addLog(date+' - '+ms.length+' matchs','var(--g)');
+      }else{
+        ms=allFx.filter(function(f){var st=f.fixture&&f.fixture.status?f.fixture.status.short:'';return TERM.indexOf(st)>=0||LIVE.indexOf(st)>=0;}).map(function(f){return parseFix(f,tz)});
+        var nIgn=allFx.length-ms.length;
+        addLog(date+' - '+ms.length+' terminés/live'+(nIgn?' ('+nIgn+' NS ignorés)':''),'var(--g)');
+      }
       if(ms.length>0){db[date]=ms;setDB(db)}
       j++;m+=ms.length;
     }
@@ -2856,7 +2866,36 @@ async function loadMatchs(source){
   var tz=getTz(),cache=buildCache(),fx=[];
   if(source==='local'){
     var db=getDB();
-    if(db[date]&&db[date].length>0){fx=db[date].slice();document.getElementById('tdLd').classList.remove('on');showAl('tdAl','in','Données base locale ('+fx.length+' matchs)')}
+    if(db[date]&&db[date].length>0){
+      fx=db[date].slice();
+      // Détecter des matchs avec statut périmé sur une date passée ou aujourd'hui
+      var staleNS=fx.filter(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0&&m.status!==''});
+      var isPastOrToday=(date<=today());
+      if(staleNS.length>0&&isPastOrToday&&cfg.apiKey){
+        // Refresh silencieux depuis l'API
+        showAl('tdAl','ayw',staleNS.length+' match(s) avec statut périmé (NS) — refresh en cours...');
+        var refreshData=await apiCall('/fixtures',{date:date});
+        if(refreshData){
+          var tz2=getTz();
+          var refreshed=refreshData.response.map(function(f){return parseFix(f,tz2)});
+          if(refreshed.length>0){
+            var db3=getDB();db3[date]=refreshed;setDB(db3);majDB();
+            fx=refreshed;
+            document.getElementById('tdLd').classList.remove('on');
+            showAl('tdAl','ok',fx.length+' matchs rafraîchis depuis l\'API (statuts mis à jour).');
+          } else {
+            document.getElementById('tdLd').classList.remove('on');
+            showAl('tdAl','in','Données base locale ('+fx.length+' matchs) — refresh API vide.');
+          }
+        } else {
+          document.getElementById('tdLd').classList.remove('on');
+          showAl('tdAl','ayw','Données base locale ('+fx.length+' matchs) — refresh API échoué, statuts possiblement périmés.');
+        }
+      } else {
+        document.getElementById('tdLd').classList.remove('on');
+        showAl('tdAl','in','Données base locale ('+fx.length+' matchs)');
+      }
+    }
     else{document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Aucun match en base pour le '+date+'. Lance la Collecte.');return}
   }else{
     if(!cfg.apiKey){document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Entre ta clé API dans Config');return}
