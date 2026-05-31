@@ -432,6 +432,7 @@ tr:hover td{background:var(--s2)}
   <button class="tab" onclick="goTab(6)">Tickets</button>
   <button class="tab" onclick="goTab(7)">Fiab.</button>
   <button class="tab" onclick="goTab(8)">Cotes</button>
+  <button class="tab" onclick="goTab(9)">&#x2B50; Sél.</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ CONFIG ══ -->
@@ -1087,6 +1088,67 @@ tr:hover td{background:var(--s2)}
   <div id="oddsAnalysisOut" style="display:none"></div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════ SÉLECTION ══ -->
+<div class="panel" id="p9">
+  <div class="card">
+    <span class="clbl">&#x2B50; Sélection du jour</span>
+    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Matchs à fort potentiel : prédictions ≥ seuil sur marchés à haute fiabilité historique.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div class="lsm">Seuil prédiction</div>
+        <div class="chips" id="selPredChips">
+          <div class="chip" onclick="setSelSeuil(65)">65%</div>
+          <div class="chip on" onclick="setSelSeuil(70)">70%</div>
+          <div class="chip" onclick="setSelSeuil(75)">75%</div>
+          <div class="chip" onclick="setSelSeuil(80)">80%</div>
+        </div>
+      </div>
+      <div>
+        <div class="lsm">Fiabilité marché min.</div>
+        <div class="chips" id="selFiabChips">
+          <div class="chip" onclick="setSelFiab(50)">50%</div>
+          <div class="chip on" onclick="setSelFiab(60)">60%</div>
+          <div class="chip" onclick="setSelFiab(70)">70%</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <div class="lsm">Top N matchs</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="range" id="selTopN" min="3" max="20" value="10" oninput="document.getElementById('selTopNVal').textContent=this.value" style="flex:1;accent-color:var(--g)"/>
+        <span id="selTopNVal" style="font-size:.9rem;font-weight:900;color:var(--g);font-family:var(--mono);min-width:24px">10</span>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <div class="lsm">Marchés à inclure</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px" id="selMktFilter">
+        <div class="chip on" data-mkt="all" onclick="toggleSelMkt(this)">Tous</div>
+        <div class="chip" data-mkt="ou" onclick="toggleSelMkt(this)">Over/Under</div>
+        <div class="chip" data-mkt="1x2" onclick="toggleSelMkt(this)">1X2</div>
+        <div class="chip" data-mkt="btts" onclick="toggleSelMkt(this)">BTTS</div>
+        <div class="chip" data-mkt="cs" onclick="toggleSelMkt(this)">CS</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <div class="lsm">Statut matchs</div>
+      <div class="chips" id="selStatusChips">
+        <div class="chip on" onclick="setSelStatus('all')">Tous</div>
+        <div class="chip" onclick="setSelStatus('soon')">À venir</div>
+        <div class="chip" onclick="setSelStatus('live')">Live</div>
+      </div>
+    </div>
+
+    <button class="btn bb" onclick="renderSelection()" style="margin-bottom:0">&#x2B50; Générer la sélection</button>
+  </div>
+
+  <div class="al" id="selAl"></div>
+  <div id="selOut" style="display:none"></div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════ FIABILITE ══ -->
 <div class="panel" id="p7">
   <div class="card">
@@ -1714,13 +1776,14 @@ function toggleComp(head){head.parentElement.querySelector('.comp-body').classLi
 function goTab(i){
   document.querySelectorAll('.tab').forEach(function(t,j){t.classList.toggle('on',i===j)});
   // Cible tous les panels par id p0..p7
-  for(var k=0;k<=8;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
+  for(var k=0;k<=9;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
   if(i===1)majDB();
   if(i===4)initStDates();
   if(i===3){renderAnHist();renderDash();initMultiTab()}
   if(i===6)document.getElementById('tkDate').value=today();
   if(i===7)initSyncDates();
   if(i===8)initOddsDates();
+  if(i===9)renderSelection();
 }
 function showAl(id,t,msg){var e=document.getElementById(id);e.className='al on a'+t;e.innerHTML=msg}
 function hideAl(id){document.getElementById(id).className='al'}
@@ -4102,6 +4165,198 @@ function exportValueBets(){
 }
 
 
+// ═══════════════════════════════════ SÉLECTION DU JOUR ═══
+var selSeuil=70, selFiabMin=60, selMktActive='all', selStatus='all';
+
+function setSelSeuil(v){
+  selSeuil=v;
+  document.querySelectorAll('#selPredChips .chip').forEach(function(c){c.classList.toggle('on',parseInt(c.textContent)===v);});
+}
+function setSelFiab(v){
+  selFiabMin=v;
+  document.querySelectorAll('#selFiabChips .chip').forEach(function(c){c.classList.toggle('on',parseInt(c.textContent)===v);});
+}
+function setSelStatus(v){
+  selStatus=v;
+  document.querySelectorAll('#selStatusChips .chip').forEach(function(c){c.classList.toggle('on',c.onclick.toString().indexOf("'"+v+"'")>=0);});
+}
+function toggleSelMkt(el){
+  selMktActive=el.dataset.mkt;
+  document.querySelectorAll('#selMktFilter .chip').forEach(function(c){c.classList.toggle('on',c.dataset.mkt===selMktActive);});
+}
+
+// Définition des marchés avec leurs clés pred et fiabilité
+function getSelMkts(s){
+  return[
+    {id:'over',label:'Over +'+s,predKey:'plus',fiabKey:'over',mktGroup:'ou'},
+    {id:'under',label:'Under -'+s,predKey:'under',fiabKey:'under',mktGroup:'ou'},
+    {id:'btts',label:'BTTS Oui',predKey:'btts',fiabKey:'btts',mktGroup:'btts'},
+    {id:'bttsN',label:'BTTS Non',predKey:'bttsNon',fiabKey:'bttsN',mktGroup:'btts'},
+    {id:'v1',label:'Victoire Dom',predKey:'v1',fiabKey:'v1',mktGroup:'1x2'},
+    {id:'x',label:'Match Nul',predKey:'x',fiabKey:'x',mktGroup:'1x2'},
+    {id:'v2',label:'Victoire Ext',predKey:'v2',fiabKey:'v2',mktGroup:'1x2'},
+    {id:'csH',label:'CS Dom',predKey:'csH',fiabKey:'csH',mktGroup:'cs'},
+    {id:'csA',label:'CS Ext',predKey:'csA',fiabKey:'csA',mktGroup:'cs'},
+    {id:'hmsc',label:'Dom Marque',predKey:'hmsc',fiabKey:'hmsc',mktGroup:'cs'},
+    {id:'amsc',label:'Ext Marque',predKey:'amsc',fiabKey:'amsc',mktGroup:'cs'},
+    {id:'dc1x',label:'DC 1X',predKey:'dc1x',fiabKey:'dc1x',mktGroup:'1x2'},
+    {id:'dcx2',label:'DC X2',predKey:'dcx2',fiabKey:'dcx2',mktGroup:'1x2'},
+    {id:'dc12',label:'DC 12',predKey:'dc12',fiabKey:'dc12',mktGroup:'1x2'},
+  ];
+}
+
+function renderSelection(){
+  var out=document.getElementById('selOut');
+  if(!allMatchsCache.length){showAl('selAl','er','Charge d\'abord les matchs (onglet Matchs)');return}
+
+  var topN=parseInt(document.getElementById('selTopN').value)||10;
+  var calib=window._calibCache||getCalib();
+  var mkts=getSelMkts(seuilTd);
+
+  // Filtrer matchs selon statut
+  var matchs=allMatchsCache.slice();
+  if(selStatus==='soon') matchs=matchs.filter(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
+  else if(selStatus==='live') matchs=matchs.filter(function(m){return LIVE.indexOf(m.status)>=0});
+  matchs=matchs.filter(function(m){return m._pred;});
+
+  if(!matchs.length){showAl('selAl','er','Aucun match avec prédiction disponible');return}
+
+  // Filtrer marchés selon groupe sélectionné
+  var filteredMkts=selMktActive==='all'?mkts:mkts.filter(function(mk){return mk.mktGroup===selMktActive;});
+
+  // Calculer le score composite pour chaque match
+  var scored=matchs.map(function(m){
+    var pred=m._pred;
+    var triggers=[];
+    var totalScore=0, nSignals=0;
+
+    filteredMkts.forEach(function(mk){
+      var predVal=pred[mk.predKey];
+      if(predVal===null||predVal===undefined)return;
+      var predPct=Math.round(predVal*100);
+      if(predPct<selSeuil)return; // sous le seuil prédit
+
+      // Fiabilité de ce marché depuis le tracking
+      var fiabData=calib[mk.fiabKey]||calib[mk.id]||null;
+      var fiabPct=fiabData&&fiabData.prec!==undefined?fiabData.prec:(fiabData&&fiabData.acc!==undefined?fiabData.acc:null);
+
+      if(fiabPct!==null&&fiabPct<selFiabMin)return; // sous le seuil fiabilité
+
+      // Score = pred% × (fiabilité/100) × bonus si très haut
+      var fiabW=fiabPct!==null?fiabPct/100:0.60; // neutre si pas de tracking
+      var predBonus=predPct>=80?1.2:predPct>=75?1.1:1.0;
+      var score=predPct*fiabW*predBonus;
+
+      triggers.push({
+        label:mk.label,predPct:predPct,fiabPct:fiabPct,
+        score:Math.round(score),mktId:mk.id
+      });
+      totalScore+=score;
+      nSignals++;
+    });
+
+    if(!nSignals)return null;
+
+    triggers.sort(function(a,b){return b.score-a.score;});
+    var composite=Math.round(totalScore/nSignals);
+
+    return{
+      match:m,pred:pred,
+      triggers:triggers,
+      composite:composite,
+      nSignals:nSignals,
+      topTrigger:triggers[0]
+    };
+  }).filter(Boolean);
+
+  if(!scored.length){
+    showAl('selAl','er','Aucun match ne répond aux critères (seuil pred '+selSeuil+'% + fiabilité '+selFiabMin+'%)');
+    out.style.display='none';return;
+  }
+
+  // Trier par score composite décroissant
+  scored.sort(function(a,b){return b.composite-a.composite;});
+  var topMatches=scored.slice(0,topN);
+
+  hideAl('selAl');
+
+  // ── Render ──
+  var html='';
+
+  // Résumé
+  html+='<div class="card" style="margin-bottom:8px">';
+  html+='<div class="sg g3">';
+  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+topMatches.length+'</div><div class="sl">S\u00e9lectionn\u00e9s</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+scored.length+'</div><div class="sl">Qualifi\u00e9s</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--dm)">'+matchs.length+'</div><div class="sl">Total</div></div>';
+  html+='</div>';
+  html+='<div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-top:6px">Crit\u00e8res : pred \u2265'+selSeuil+'% · fiabilit\u00e9 \u2265'+selFiabMin+'%'+(selMktActive!=='all'?' · march\u00e9: '+selMktActive:'')+'</div>';
+  html+='</div>';
+
+  topMatches.forEach(function(item,rank){
+    var m=item.match;
+    var pred=item.pred;
+    var isLive=LIVE.indexOf(m.status)>=0;
+    var isDone=TERM.indexOf(m.status)>=0;
+    var statusCol=isLive?'var(--r)':isDone?'var(--dm)':'var(--y)';
+    var statusTxt=isLive?'LIVE':isDone?'FT':(m.heure||'');
+    var score=item.composite;
+    var scoreCol=score>=70?'var(--g)':score>=55?'var(--y)':'var(--dm)';
+
+    html+='<div class="card" style="margin-bottom:8px;border-left:3px solid '+scoreCol+'">';
+
+    // Header: rang + match + statut
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    html+='<div style="display:flex;align-items:center;gap:8px">';
+    html+='<span style="font-size:1rem;font-weight:900;color:'+scoreCol+';font-family:var(--mono);min-width:22px">#'+(rank+1)+'</span>';
+    html+='<div>';
+    html+='<div style="font-size:.8rem;font-weight:700">'+m.home+' vs '+m.away+'</div>';
+    html+='<div style="font-size:.58rem;color:var(--dm);font-family:var(--mono)">'+( m.league||'?')+(m.heure?' · '+m.heure:'')+'</div>';
+    html+='</div></div>';
+    html+='<div style="text-align:right">';
+    html+='<div style="font-size:1.1rem;font-weight:900;color:'+scoreCol+'">'+score+'</div>';
+    html+='<div style="font-size:.5rem;color:var(--dm);font-family:var(--mono)">SCORE</div>';
+    html+='</div></div>';
+
+    // Signaux déclencheurs
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">';
+    item.triggers.forEach(function(tr){
+      var col=tr.predPct>=80?'var(--g)':tr.predPct>=75?'var(--y)':'var(--b)';
+      var fiabTxt=tr.fiabPct!==null?(' · fiab '+tr.fiabPct+'%'):'';
+      html+='<div style="padding:4px 8px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid '+col+';font-size:.62rem;font-family:var(--mono)">';
+      html+='<span style="color:'+col+';font-weight:700">'+tr.predPct+'%</span>';
+      html+='<span style="color:var(--dm)"> '+tr.label+fiabTxt+'</span>';
+      html+='</div>';
+    });
+    html+='</div>';
+
+    // Conf bar
+    html+='<div class="conf-bar"><div class="conf-track"><div class="conf-fill" style="width:'+pred.conf+'%;background:var(--g)"></div></div>';
+    html+='<span class="conf-lbl">Conf. '+pred.conf+'% · '+item.nSignals+' signal'+(item.nSignals>1?'s':'')+'</span></div>';
+
+    // Status badge
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">';
+    html+='<span style="font-size:.6rem;color:'+statusCol+';font-family:var(--mono);font-weight:700">'+statusTxt+'</span>';
+
+    // Trouver l'index dans _matchRefs pour le bouton scénario
+    var matchIdx=-1;
+    if(window._matchRefs){
+      for(var mi=0;mi<window._matchRefs.length;mi++){
+        if(window._matchRefs[mi].id===m.id){matchIdx=mi;break;}
+      }
+    }
+    html+='<div style="display:flex;gap:5px">';
+    if(matchIdx>=0){
+      html+='<button class="bsm" onclick="openScenarioModal('+matchIdx+')" style="padding:5px 10px;font-size:.6rem;border-color:var(--teal);color:var(--teal)">Sc\u00e9nario</button>';
+    }
+    html+='</div></div></div>';
+  });
+
+  out.innerHTML=html;
+  out.style.display='block';
+}
+
+
 function loadRecalageWeights(){try{var w=JSON.parse(localStorage.getItem(RECALAGE_KEY));if(w)RECALAGE_WEIGHTS=w;}catch(e){}}
 function saveRecalageWeights(w){RECALAGE_WEIGHTS=w;localStorage.setItem(RECALAGE_KEY,JSON.stringify(w));}
 
@@ -4419,6 +4674,38 @@ function calc00(){
     });
   });
 
+  // ─── Tranches de prédiction 0-0 ───
+  // Pour chaque entrée trackée, calculer la pred 0-0 et voir si le 0-0 s'est produit
+  var pred00Tranches=[
+    {lbl:'<15%',min:0,max:14,n:0,ok:0},
+    {lbl:'15–20%',min:15,max:20,n:0,ok:0},
+    {lbl:'20–25%',min:20,max:25,n:0,ok:0},
+    {lbl:'25–30%',min:25,max:30,n:0,ok:0},
+    {lbl:'30–40%',min:30,max:40,n:0,ok:0},
+    {lbl:'40%+',min:40,max:100,n:0,ok:0},
+  ];
+  var cache=buildCache();
+  if(cache.total>0){
+    track.forEach(function(t){
+      if(t.rH===undefined||t.rH===null||t.rA===null)return;
+      // Reconstruire le match depuis le tracking (rH/rA sont les vrais scores)
+      var fakeM={league:t.league||'?',country:t.country||'',heure:t.heure||'??',
+                 home:t.home||'?',away:t.away||'?',id:t.id};
+      // Reconstruire pred depuis les champs pXxx du tracking
+      var fakePred=t.pPlus!==null?{
+        plus:t.pPlus/100,under:t.pUnder/100,btts:t.pBtts/100,bttsNon:t.pBttsNon/100,
+        v1:t.pV1/100,x:t.pX/100,v2:t.pV2/100,csH:t.pCsH/100,csA:t.pCsA/100,
+        hmsc:t.pHmsc/100,amsc:t.pAmsc/100,conf:t.pConf||0
+      }:null;
+      var p00=compute00Badge(fakeM,fakePred);
+      if(p00===null)return;
+      var is00=t.rH===0&&t.rA===0;
+      pred00Tranches.forEach(function(tr){
+        if(p00>=tr.min&&p00<=tr.max){tr.n++;if(is00)tr.ok++;}
+      });
+    });
+  }
+
   // ─── RENDER ───
   var pct=Math.round(rate*100);
   var html='<div class="card">';
@@ -4492,6 +4779,26 @@ function calc00(){
       html+='<div class="br2"><div class="bn" style="width:130px">'+t.name.substring(0,20)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--y)">'+t.n00+' 0-0 / '+t.total+' ('+p+'%)</div></div></div>';
     });
     html+='</div>';
+  }
+
+  // ─── Tranches prédiction 0-0 ───
+  var validTranches=pred00Tranches.filter(function(t){return t.n>=2;});
+  if(validTranches.length){
+    html+='<div class="st" style="margin:12px 0 8px">&#x1F4CA; Tranches de prédiction 0-0</div>';
+    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Quand FootStats prédit X% de 0-0, est-ce que ça se réalise ? La tranche avec le meilleur taux réel = signal le plus fiable.</div>';
+    html+='<div class="tbl"><table><thead><tr><th>Tranche pred</th><th>Matchs</th><th>0-0 réels</th><th>Taux réel</th><th>Fiabilité</th></tr></thead><tbody>';
+    var bestTranche=null,bestRate=0;
+    validTranches.forEach(function(tr){
+      var rate00=Math.round(tr.ok/tr.n*100);
+      var col=rate00>=25?'tg':rate00>=15?'ty':'';
+      var fiab=tr.n>=10?'★★★':tr.n>=5?'★★':'★';
+      html+='<tr><td style="font-weight:700">'+tr.lbl+'</td><td>'+tr.n+'</td><td>'+tr.ok+'</td><td class="'+col+'">'+rate00+'%</td><td style="color:var(--y)">'+fiab+'</td></tr>';
+      if(rate00>bestRate&&tr.n>=3){bestRate=rate00;bestTranche=tr;}
+    });
+    html+='</tbody></table></div>';
+    if(bestTranche){
+      html+='<div style="margin-top:8px;padding:8px;background:rgba(176,107,255,.08);border:1px solid rgba(176,107,255,.3);border-radius:7px;font-size:.68rem;font-family:var(--mono)">&#x1F3AF; Meilleure tranche : <strong style="color:var(--p)">'+bestTranche.lbl+'</strong> → 0-0 réel '+bestRate+'% des fois ('+bestTranche.n+' matchs)</div>';
+    }
   }
 
   // Corrélations marchés
@@ -4653,7 +4960,7 @@ function renderFiabOut(){
   var savedTk=getTickets(),tkWon=savedTk.filter(function(t){return t.result==='won'}).length;
   var tkLost=savedTk.filter(function(t){return t.result==='lost'}).length,tkTotal=tkWon+tkLost;
   var html='';
-  html+='<div class="fiab-tabs"><button class="fiab-tab'+(fiabView==='resume'?' on':'')+'" data-v="resume" onclick="setFiabView(\'resume\')">Résumé</button><button class="fiab-tab'+(fiabView==='marches'?' on':'')+'" data-v="marches" onclick="setFiabView(\'marches\')">Marchés</button><button class="fiab-tab'+(fiabView==='analyse'?' on':'')+'" data-v="analyse" onclick="setFiabView(\'analyse\')">Analyse</button><button class="fiab-tab'+(fiabView==='roi'?' on':'')+'" data-v="roi" onclick="setFiabView(\'roi\')">ROI</button></div>';
+  html+='<div class="fiab-tabs"><button class="fiab-tab'+(fiabView==='resume'?' on':'')+'" data-v="resume" onclick="setFiabView(\'resume\')">Résumé</button><button class="fiab-tab'+(fiabView==='marches'?' on':'')+'" data-v="marches" onclick="setFiabView(\'marches\')">Marchés</button><button class="fiab-tab'+(fiabView==='analyse'?' on':'')+'" data-v="analyse" onclick="setFiabView(\'analyse\')">Analyse</button><button class="fiab-tab'+(fiabView==='roi'?' on':'')+'" data-v="roi" onclick="setFiabView(\'roi\')">ROI</button><button class="fiab-tab'+(fiabView==='tranches'?' on':'')+'" data-v="tranches" onclick="setFiabView(\'tranches\')">Tranches</button></div>';
   if(calibApplied){html+='<div style="background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:.64rem;line-height:1.7"><div style="font-weight:700;color:var(--g);margin-bottom:2px">⚡ Auto-calibration active</div><div style="color:var(--dm);font-family:var(--mono)">'+Object.entries(newCalib).map(function(e){var f=e[1],mkt=mkts.find(function(m){return m.id===e[0]});return'<span style="margin-right:5px">'+(mkt?mkt.label:e[0])+' '+(f>1.05?'↑':f<0.95?'↓':'≈')+'×'+f+'</span>'}).join('')+'</div></div>'}
   function accBox(id,lbl){var st=mktStats[id];if(!st||st.acc===null)return'<div class="sb"><div class="sv" style="color:var(--dm)">?</div><div class="sl">'+lbl+'</div></div>';var col=st.acc>=60?'var(--g)':st.acc>=45?'var(--y)':'var(--r)';return'<div class="sb"><div class="sv" style="color:'+col+'">'+st.acc+'%</div><div class="sl">'+lbl+'</div></div>'}
   if(fiabView==='resume'){
@@ -4696,6 +5003,59 @@ function renderFiabOut(){
     html+='</table></div>';
     var roiPos=roiRows.filter(function(r){return r.roi>0});
     html+='<div class="sg g2"><div class="sb" style="border-color:rgba(0,229,160,.3)"><div class="sv" style="color:var(--g)">'+roiPos.length+'</div><div class="sl">+ ROI</div></div><div class="sb" style="border-color:rgba(255,61,90,.3)"><div class="sv" style="color:var(--r)">'+(roiRows.length-roiPos.length)+'</div><div class="sl">- ROI</div></div></div>';
+  }
+  else if(fiabView==='tranches'){
+    html+='<div style="font-size:.63rem;color:var(--dm);margin-bottom:10px;font-family:var(--mono);line-height:1.6">Pour chaque marché : à quelle tranche de prédiction FootStats est-il le plus précis ? La tranche verte = zone de confiance maximale.</div>';
+    var TRANCHES=[{lbl:'<40%',min:0,max:39},{lbl:'40-49%',min:40,max:49},{lbl:'50-59%',min:50,max:59},{lbl:'60-69%',min:60,max:69},{lbl:'70-79%',min:70,max:79},{lbl:'80%+',min:80,max:100}];
+    mkts.forEach(function(mkt){
+      var valid=entries.filter(function(t){return t[mkt.pKey]!==null&&t[mkt.pKey]!==undefined;});
+      if(valid.length<5)return;
+      // Calculer précision par tranche
+      var trData=TRANCHES.map(function(tr){
+        var inTr=valid.filter(function(t){return t[mkt.pKey]>=tr.min&&t[mkt.pKey]<=tr.max;});
+        if(!inTr.length)return null;
+        var ok=inTr.filter(function(t){return getRealVal(t,mkt);}).length;
+        var acc=Math.round(ok/inTr.length*100);
+        var mid=Math.round((tr.min+tr.max)/2);
+        var delta=acc-mid; // calibration : réel vs attendu
+        return{lbl:tr.lbl,n:inTr.length,ok:ok,acc:acc,mid:mid,delta:delta};
+      }).filter(Boolean);
+      if(!trData.length)return;
+      // Trouver la meilleure tranche (précision la plus haute avec min 3 matchs)
+      var best=trData.filter(function(t){return t.n>=3;}).sort(function(a,b){return b.acc-a.acc;})[0];
+      html+='<div class="card" style="margin-bottom:8px;padding:10px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      html+='<span style="font-size:.75rem;font-weight:700">'+mkt.label+'</span>';
+      if(best)html+='<span style="font-size:.62rem;font-family:var(--mono);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--g);padding:2px 8px;border-radius:5px">Optimal: '+best.lbl+' → '+best.acc+'%</span>';
+      html+='</div>';
+      html+='<div class="bars">';
+      trData.forEach(function(tr){
+        var col=tr.acc>=65?'var(--g)':tr.acc>=50?'var(--y)':'var(--r)';
+        var isBest=best&&tr.lbl===best.lbl;
+        var deltaStr=(tr.delta>0?'+':'')+tr.delta+'%';
+        var deltacol=Math.abs(tr.delta)<=5?'var(--g)':Math.abs(tr.delta)<=10?'var(--y)':'var(--r)';
+        html+='<div class="br2" style="'+(isBest?'background:rgba(0,229,160,.04);border-radius:5px;padding:2px 0;':'')+'">'+
+          '<div class="bn" style="width:52px;'+(isBest?'color:var(--g);':'')+'">'+tr.lbl+'</div>'+
+          '<div class="bb2">'+
+            '<div class="bf" style="width:'+Math.min(100,tr.acc)+'%;background:'+col+'">'+
+              tr.acc+'% ('+tr.ok+'/'+tr.n+') <span style="color:'+deltacol+';margin-left:4px">Δ'+deltaStr+'</span>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      });
+      html+='</div>';
+      // Note si tranche faible meilleure que haute
+      var trFaibles=trData.filter(function(t){return t.mid<50&&t.n>=3;});
+      var trHautes=trData.filter(function(t){return t.mid>=50&&t.n>=3;});
+      if(trFaibles.length&&trHautes.length){
+        var bestFaible=trFaibles.sort(function(a,b){return b.acc-a.acc;})[0];
+        var bestHaute=trHautes.sort(function(a,b){return b.acc-a.acc;})[0];
+        if(bestFaible.acc>bestHaute.acc+5){
+          html+='<div style="margin-top:6px;font-size:.6rem;color:var(--y);font-family:var(--mono)">⚠️ Les prédictions faibles (&lt;50%) sont plus fiables que les hautes — logique inverse détectée</div>';
+        }
+      }
+      html+='</div>';
+    });
   }
   html+='<div class="sg g2" style="margin-top:12px"><button class="bsm" onclick="exportTrack()" style="padding:9px;text-align:center">Exporter JSON</button><button class="bsm" onclick="clearTrack()" style="padding:9px;text-align:center;color:var(--r);border-color:var(--r)">Effacer tracking</button></div>';
   var out=document.getElementById('fiabOut');out.innerHTML=html;out.style.display='block';
