@@ -427,13 +427,12 @@ tr:hover td{background:var(--s2)}
   <button class="tab" onclick="goTab(1)">Collecte</button>
   <button class="tab" onclick="goTab(2)">Matchs</button>
   <button class="tab" onclick="goTab(3)">Analyse</button>
-  <button class="tab" onclick="goTab(4)">Stats</button>
-  <button class="tab" onclick="goTab(5)">Compet.</button>
-  <button class="tab" onclick="goTab(6)">Tickets</button>
-  <button class="tab" onclick="goTab(7)">Fiab.</button>
-  <button class="tab" onclick="goTab(8)">Cotes</button>
-  <button class="tab" onclick="goTab(9)">&#x2B50; Sél.</button>
-  <button class="tab" onclick="goTab(10)">&#x1F4E5; Dump</button>
+  <button class="tab" onclick="goTab(4)">Stats &amp; Comp.</button>
+  <button class="tab" onclick="goTab(5)">Tickets</button>
+  <button class="tab" onclick="goTab(6)">Fiab.</button>
+  <button class="tab" onclick="goTab(7)">Cotes</button>
+  <button class="tab" onclick="goTab(8)">&#x2B50; Sél.</button>
+  <button class="tab" onclick="goTab(9)">&#x1F4E5; Dump</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ CONFIG ══ -->
@@ -443,16 +442,17 @@ tr:hover td{background:var(--s2)}
   <div class="card">
     <span class="clbl">Clé API-Football</span>
     <div style="display:flex;gap:7px"><input class="inp" id="cfgKey" type="password" placeholder="Clé api-sports.io..."/><button class="bsm" onclick="togglePwd('cfgKey')">voir</button></div>
+    <div style="font-size:.62rem;color:var(--dm);margin-top:5px;font-family:var(--mono)">Utilisée aussi pour le Dump historique (stats, xG) · <a href="https://dashboard.api-football.com/register" target="_blank" style="color:var(--b)">Plan gratuit : 100 req/jour</a></div>
+  </div>
+  <div class="card">
+    <span class="clbl">Clé TheStatsAPI (Dump massif — essai 7j)</span>
+    <div style="font-size:.62rem;color:var(--dm);margin-top:2px;margin-bottom:6px;font-family:var(--mono)">Matchs + stats + xG + cotes historiques · 100k req/mois · <a href="https://www.thestatsapi.com/auth?mode=signup" target="_blank" style="color:var(--b)">Démarrer l'essai gratuit</a></div>
+    <div style="display:flex;gap:7px"><input class="inp" id="cfgStatsKey" type="password" placeholder="Bearer token TheStatsAPI..."/><button class="bsm" onclick="togglePwd('cfgStatsKey')">voir</button></div>
   </div>
   <div class="card">
     <span class="clbl">Clé The Odds API (Cotes — optionnel)</span>
     <div style="display:flex;gap:7px"><input class="inp" id="cfgOddsApi" type="password" placeholder="Clé the-odds-api.com..."/><button class="bsm" onclick="togglePwd('cfgOddsApi')">voir</button></div>
     <div style="font-size:.64rem;color:var(--dm);margin-top:5px;font-family:var(--mono)">Plan gratuit : 500 req/mois · <a href="https://the-odds-api.com/#get-access" target="_blank" style="color:var(--b)">Obtenir une clé gratuite</a></div>
-  </div>
-  <div class="card">
-    <span class="clbl">Clé TheStatsAPI (Dump historique — optionnel)</span>
-    <div style="font-size:.64rem;color:var(--dm);margin-top:2px;margin-bottom:6px;font-family:var(--mono)">Essai 7j gratuit · xG, stats, cotes historiques · <a href="https://thestatsapi.com" target="_blank" style="color:var(--b)">thestatsapi.com</a></div>
-    <div style="display:flex;gap:7px"><input class="inp" id="cfgStatsKey" type="password" placeholder="Bearer token TheStatsAPI..."/><button class="bsm" onclick="togglePwd('cfgStatsKey')">voir</button></div>
   </div>
   <div class="card">
     <span class="clbl">Clé Groq (IA — optionnel)</span>
@@ -897,6 +897,14 @@ tr:hover td{background:var(--s2)}
 
 <!-- ═══════════════════════════════════════════════════════ STATS ══ -->
 <div class="panel" id="p4">
+<!-- Sous-onglets Stats / Compet. -->
+<div style="display:flex;gap:0;background:var(--s1);border:1px solid var(--bd);border-radius:9px;overflow:hidden;margin-bottom:12px">
+  <button id="subTabStats" onclick="setSubTab('stats')" style="flex:1;padding:8px 4px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font);border:none;cursor:pointer;background:var(--s3);color:var(--g);border-bottom:2px solid var(--g);transition:all .2s">Stats</button>
+  <button id="subTabComp" onclick="setSubTab('comp')" style="flex:1;padding:8px 4px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font);border:none;cursor:pointer;background:transparent;color:var(--dm);border-bottom:2px solid transparent;transition:all .2s">Compet.</button>
+</div>
+
+<!-- Stats panel -->
+<div id="subPanelStats">
   <div class="card">
     <span class="clbl">Filtres</span>
     <div class="r2" style="margin-bottom:10px">
@@ -930,8 +938,8 @@ tr:hover td{background:var(--s2)}
   <div id="stOut" style="display:none"></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ COMPET. ══ -->
-<div class="panel" id="p5">
+<!-- Compet panel -->
+<div id="subPanelComp" style="display:none">
   <div class="card">
     <span class="clbl">Toutes les compétitions</span>
     <input class="inp" id="compSearch" placeholder="Rechercher compétition ou pays..." oninput="filterComps()" style="margin-bottom:10px"/>
@@ -954,9 +962,11 @@ tr:hover td{background:var(--s2)}
   <div id="compSummary" style="display:none;margin-bottom:12px"></div>
   <div id="compList"></div>
 </div>
+</div>
+
 
 <!-- ═══════════════════════════════════════════════════════ TICKETS ══ -->
-<div class="panel" id="p6">
+<div class="panel" id="p5">
   <div class="card">
     <span class="clbl">Générateur de tickets combinés</span>
     <div class="r2" style="margin-bottom:10px">
@@ -1012,7 +1022,7 @@ tr:hover td{background:var(--s2)}
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ ODDS ══ -->
-<div class="panel" id="p8">
+<div class="panel" id="p7">
   <div class="info-api" style="margin-bottom:10px"><strong>The Odds API :</strong> Inscris-toi sur <a href="https://the-odds-api.com" target="_blank" style="color:var(--g)">the-odds-api.com</a> · Plan gratuit : 500 req/mois · Clé à saisir dans Config</div>
   <div class="card">
     <span class="clbl">Collecte globale des cotes</span>
@@ -1095,7 +1105,7 @@ tr:hover td{background:var(--s2)}
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ SÉLECTION ══ -->
-<div class="panel" id="p9">
+<div class="panel" id="p8">
   <div class="card">
     <span class="clbl">&#x2B50; Sélection du jour</span>
     <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Matchs à fort potentiel : prédictions ≥ seuil sur marchés à haute fiabilité historique.</p>
@@ -1155,8 +1165,68 @@ tr:hover td{background:var(--s2)}
   <div id="selOut" style="display:none"></div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════ DUMP STATS ══ -->
+<div class="panel" id="p9">
+  <div class="card">
+    <span class="clbl">&#x1F4E5; Dump historique — API-Football</span>
+    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Enrichit tes matchs en base avec stats réelles (possession, tirs, corners) et xG depuis API-Football. Utilise ta clé existante.</p>
+
+    <div style="background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.25);border-radius:8px;padding:10px;margin-bottom:12px;font-size:.62rem;color:var(--y);font-family:var(--mono);line-height:1.6">
+      ⚡ Plan Starter : 100k req/mois · 120 req/min. Stratégie : dump massif dès l'activation de l'essai, tout est stocké localement en cache.
+    </div>
+
+    <div style="margin-bottom:10px">
+      <div class="lsm">Mode</div>
+      <div class="chips" id="dumpEnrichChips">
+        <div class="chip on" data-mode="enrich" onclick="setDumpMode('enrich')">Enrichir matchs existants</div>
+        <div class="chip" data-mode="all" onclick="setDumpMode('all')">Dump massif (ligues + saisons)</div>
+      </div>
+      <div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-top:5px;line-height:1.5">
+        <b>Enrichissement</b> : stats/xG/cotes sur les matchs déjà en base. Rapide, économise les requêtes.<br>
+        <b>Dump massif</b> : collecte tout — matchs + stats + xG + cotes · ligues de ta base × N saisons.
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div class="lsm">Nombre de saisons (dump massif)</div>
+      <div class="chips" id="dumpSaisonChips">
+        <div class="chip" data-val="1" onclick="setDumpSaisons(1)">1 an</div>
+        <div class="chip on" data-val="3" onclick="setDumpSaisons(3)">3 ans</div>
+        <div class="chip" data-val="5" onclick="setDumpSaisons(5)">5 ans</div>
+        <div class="chip" data-val="10" onclick="setDumpSaisons(10)">10 ans</div>
+      </div>
+      <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:4px">3 ans × 5 ligues ≈ 15-20k req (matchs + stats + cotes)</div>
+    </div>
+
+    <button id="btnDump" class="btn bb" onclick="startDump()" style="margin-bottom:7px">&#x1F4E5; Lancer le dump</button>
+    <button class="bsm" onclick="stopDump()" id="btnDumpStop" style="display:none;width:100%;padding:9px;text-align:center;color:var(--r);border-color:var(--r)">&#x23F9; Arrêter</button>
+  </div>
+
+  <div class="al" id="dumpAl"></div>
+
+  <!-- Progress -->
+  <div id="dumpProgress" style="display:none;margin-bottom:8px">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:.65rem;font-family:var(--mono)">
+        <span id="dumpMsg" style="color:var(--b)">Initialisation...</span>
+        <span id="dumpPct" style="color:var(--g);font-weight:700">0%</span>
+      </div>
+      <div class="lb"><div class="lf" id="dumpFill" style="width:0%"></div></div>
+      <div class="sg g4" style="margin-top:8px">
+        <div class="sb"><div class="sv" id="dumpNMatches" style="color:var(--g);font-size:.9rem">0</div><div class="sl">Matchs</div></div>
+        <div class="sb"><div class="sv" id="dumpNStats" style="color:var(--b);font-size:.9rem">0</div><div class="sl">Stats</div></div>
+        <div class="sb"><div class="sv" id="dumpNXg" style="color:var(--p);font-size:.9rem">0</div><div class="sl">xG</div></div>
+        <div class="sb"><div class="sv" id="dumpNOdds" style="color:var(--y);font-size:.9rem">0</div><div class="sl">Cotes hist.</div></div>
+      </div>
+      <div id="dumpReqCount" style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:6px">Requêtes : 0</div>
+    </div>
+  </div>
+
+  <div id="dumpOut" style="display:none"></div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════ FIABILITE ══ -->
-<div class="panel" id="p7">
+<div class="panel" id="p6">
   <div class="card">
     <span class="clbl">Fiabilité & auto-calibration</span>
     <p style="font-size:.74rem;color:var(--dm);margin-bottom:12px;line-height:1.5;font-family:var(--mono)">Compare prédictions vs résultats réels sur les 14 marchés FootStats + les analyses BTTS. Le moteur s'auto-ajuste.</p>
@@ -1268,87 +1338,6 @@ tr:hover td{background:var(--s2)}
   </div>
 </div>
 </div><!-- end .app -->
-
-<!-- ═══════════════════════════════════════════════════════ DUMP STATS ══ -->
-<div class="panel" id="p10">
-  <div class="card">
-    <span class="clbl">&#x1F4E5; Dump historique — TheStatsAPI</span>
-    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Collecte massive pendant les 7 jours d'essai. Enrichit tes matchs en base avec xG, tirs, possession, corners et cotes historiques.</p>
-
-    <div style="background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.25);border-radius:8px;padding:10px;margin-bottom:12px;font-size:.62rem;color:var(--y);font-family:var(--mono);line-height:1.6">
-      &#x26A1; Stratégie 7 jours : 100k req/mois = ~3300/jour.<br>
-      Priorise les ligues de ta base. Cache tout localement.
-    </div>
-
-    <div style="margin-bottom:10px">
-      <div class="lsm">Ligues à collecter</div>
-      <div id="dumpLigues" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">
-        <div class="chip on" data-id="1" onclick="toggleDumpLigue(this)">Premier League</div>
-        <div class="chip on" data-id="2" onclick="toggleDumpLigue(this)">La Liga</div>
-        <div class="chip on" data-id="3" onclick="toggleDumpLigue(this)">Bundesliga</div>
-        <div class="chip on" data-id="4" onclick="toggleDumpLigue(this)">Serie A</div>
-        <div class="chip on" data-id="5" onclick="toggleDumpLigue(this)">Ligue 1</div>
-        <div class="chip" data-id="6" onclick="toggleDumpLigue(this)">Eredivisie</div>
-        <div class="chip" data-id="7" onclick="toggleDumpLigue(this)">Liga Portugal</div>
-        <div class="chip" data-id="custom" onclick="toggleDumpLigue(this)">+ Ligues base</div>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div>
-        <div class="lsm">Saisons</div>
-        <div class="chips" id="dumpSaisonChips">
-          <div class="chip" onclick="setDumpSaisons(1)">1 an</div>
-          <div class="chip on" onclick="setDumpSaisons(3)">3 ans</div>
-          <div class="chip" onclick="setDumpSaisons(5)">5 ans</div>
-          <div class="chip" onclick="setDumpSaisons(10)">10 ans</div>
-        </div>
-      </div>
-      <div>
-        <div class="lsm">Données à collecter</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px" id="dumpDataChips">
-          <div class="chip on" data-type="matches" onclick="toggleDumpData(this)">Matchs</div>
-          <div class="chip on" data-type="stats" onclick="toggleDumpData(this)">Stats</div>
-          <div class="chip on" data-type="xg" onclick="toggleDumpData(this)">xG</div>
-          <div class="chip on" data-type="odds" onclick="toggleDumpData(this)">Cotes hist.</div>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-bottom:10px">
-      <div class="lsm">Enrichir la base existante</div>
-      <div class="chips" id="dumpEnrichChips">
-        <div class="chip on" onclick="setDumpMode('enrich')">Enrichir matchs existants</div>
-        <div class="chip" onclick="setDumpMode('all')">Tout collecter</div>
-      </div>
-    </div>
-
-    <button id="btnDump" class="btn bb" onclick="startDump()" style="margin-bottom:7px">&#x1F4E5; Lancer le dump</button>
-    <button class="bsm" onclick="stopDump()" id="btnDumpStop" style="display:none;width:100%;padding:9px;text-align:center;color:var(--r);border-color:var(--r)">&#x23F9; Arrêter</button>
-  </div>
-
-  <div class="al" id="dumpAl"></div>
-
-  <!-- Progress -->
-  <div id="dumpProgress" style="display:none;margin-bottom:8px">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:.65rem;font-family:var(--mono)">
-        <span id="dumpMsg" style="color:var(--b)">Initialisation...</span>
-        <span id="dumpPct" style="color:var(--g);font-weight:700">0%</span>
-      </div>
-      <div class="lb"><div class="lf" id="dumpFill" style="width:0%"></div></div>
-      <div class="sg g4" style="margin-top:8px">
-        <div class="sb"><div class="sv" id="dumpNMatches" style="color:var(--g);font-size:.9rem">0</div><div class="sl">Matchs</div></div>
-        <div class="sb"><div class="sv" id="dumpNStats" style="color:var(--b);font-size:.9rem">0</div><div class="sl">Stats</div></div>
-        <div class="sb"><div class="sv" id="dumpNXg" style="color:var(--p);font-size:.9rem">0</div><div class="sl">xG</div></div>
-        <div class="sb"><div class="sv" id="dumpNOdds" style="color:var(--y);font-size:.9rem">0</div><div class="sl">Cotes</div></div>
-      </div>
-      <div id="dumpReqCount" style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:6px">Requêtes : 0</div>
-    </div>
-  </div>
-
-  <div id="dumpOut" style="display:none"></div>
-</div>
 <script>
 // ═══════════════════════════════════ CONSTANTS & STATE ═══
 var DB_KEY='fsa_db_v5',CFG_KEY='fsa_cfg_v6',RES_KEY='fsa_res_v1',TRACK_KEY='fsa_track_v2',TK_KEY='fsa_tickets_v1',CALIB_KEY='fsa_calib_v1',AN_KEY='btts_h_v1';
@@ -1872,16 +1861,28 @@ function toggleComp(head){head.parentElement.querySelector('.comp-body').classLi
 
 function goTab(i){
   document.querySelectorAll('.tab').forEach(function(t,j){t.classList.toggle('on',i===j)});
-  // Cible tous les panels par id p0..p10
-  for(var k=0;k<=10;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
+  for(var k=0;k<=9;k++){var el=document.getElementById('p'+k);if(el)el.classList.toggle('on',i===k);}
   if(i===1)majDB();
   if(i===4)initStDates();
   if(i===3){renderAnHist();renderDash();initMultiTab()}
-  if(i===6)document.getElementById('tkDate').value=today();
-  if(i===7)initSyncDates();
-  if(i===8)initOddsDates();
-  if(i===9)renderSelection();
-  if(i===10)initDumpPanel();
+  if(i===5)document.getElementById('tkDate').value=today();
+  if(i===6)initSyncDates();
+  if(i===7)initOddsDates();
+  if(i===8)renderSelection();
+  if(i===9)initDumpPanel();
+}
+function setSubTab(tab){
+  var isStats=tab==='stats';
+  document.getElementById('subPanelStats').style.display=isStats?'block':'none';
+  document.getElementById('subPanelComp').style.display=isStats?'none':'block';
+  var btnStats=document.getElementById('subTabStats');
+  var btnComp=document.getElementById('subTabComp');
+  btnStats.style.background=isStats?'var(--s3)':'transparent';
+  btnStats.style.color=isStats?'var(--g)':'var(--dm)';
+  btnStats.style.borderBottom=isStats?'2px solid var(--g)':'2px solid transparent';
+  btnComp.style.background=isStats?'transparent':'var(--s3)';
+  btnComp.style.color=isStats?'var(--dm)':'var(--g)';
+  btnComp.style.borderBottom=isStats?'2px solid transparent':'2px solid var(--g)';
 }
 function showAl(id,t,msg){var e=document.getElementById(id);e.className='al on a'+t;e.innerHTML=msg}
 function hideAl(id){document.getElementById(id).className='al'}
@@ -1947,9 +1948,9 @@ function majTz(){
 }
 function saveCfgUI(){
   cfg.apiKey=document.getElementById('cfgKey').value.trim();
+  cfg.statsApiKey=document.getElementById('cfgStatsKey').value.trim();
   cfg.groqKey=document.getElementById('cfgGroq').value.trim();
   cfg.oddsApiKey=document.getElementById('cfgOddsApi').value.trim();
-  cfg.statsApiKey=document.getElementById('cfgStatsKey').value.trim();
   cfg.tz=parseInt(document.getElementById('cfgTz').value);if(isNaN(cfg.tz))cfg.tz=0;
   cfg.seuil=seuil;setCfg(cfg);
   showAl('cfgAl','ok','Configuration sauvegardée!');setTimeout(function(){hideAl('cfgAl')},2500);majDB();
@@ -1957,9 +1958,9 @@ function saveCfgUI(){
 function initCfg(){
   var s=getCfg();cfg=Object.assign({apiKey:'',groqKey:'',oddsApiKey:'',statsApiKey:'',tz:autoTz(),seuil:2.5},s);if(isNaN(cfg.tz))cfg.tz=0;
   document.getElementById('cfgKey').value=cfg.apiKey||'';
+  document.getElementById('cfgStatsKey').value=cfg.statsApiKey||'';
   document.getElementById('cfgGroq').value=cfg.groqKey||'';
   document.getElementById('cfgOddsApi').value=cfg.oddsApiKey||'';
-  document.getElementById('cfgStatsKey').value=cfg.statsApiKey||'';
   if(cfg.seuil){seuil=cfg.seuil;setSeuil(seuil)}
   var sel=document.getElementById('cfgTz');
   for(var i=0;i<sel.options.length;i++){if(parseInt(sel.options[i].value)===cfg.tz){sel.selectedIndex=i;break}}
@@ -3018,6 +3019,28 @@ function buildMatchHTML(m,pred,s){
     }
   }
   html+='<div class="conf-bar" style="margin-top:7px"><div class="conf-track"><div class="conf-fill" style="width:'+pred.conf+'%;background:var(--g)"></div></div><span class="conf-lbl">Conf. '+pred.conf+'% · '+pred.ligTotal+' hist.'+(pred.moyButs?' · '+pred.moyButs+' buts/m':'')+'</span></div>';
+  // Afficher xG et stats enrichis si disponibles
+  if(m._xg&&(m._xg.home!==null||m._xg.away!==null)){
+    html+='<div style="display:flex;gap:8px;margin-top:5px;font-size:.58rem;font-family:var(--mono)">';
+    html+='<span style="color:var(--p)">xG: '+(m._xg.home!==null?parseFloat(m._xg.home).toFixed(2):'?')+' – '+(m._xg.away!==null?parseFloat(m._xg.away).toFixed(2):'?')+'</span>';
+    if(m._xg.npxgHome!==null&&m._xg.npxgHome!==undefined)html+='<span style="color:var(--dm)">npxG: '+parseFloat(m._xg.npxgHome).toFixed(2)+' – '+parseFloat(m._xg.npxgAway).toFixed(2)+'</span>';
+    html+='</div>';
+  }
+  if(m._stats){
+    var st=m._stats;
+    html+='<div style="display:flex;gap:8px;margin-top:4px;font-size:.55rem;font-family:var(--mono);color:var(--dm);flex-wrap:wrap">';
+    // Nouvelle structure: st.possession.h, st.shots.h, st.corners.h
+    var poss=st.possession||{h:st.possessionHome,a:st.possessionAway};
+    var shots=st.shots||{h:st.shotsHome,a:st.shotsAway};
+    var sot=st.shotsOnTarget||{h:st.shotsOnTargetHome,a:st.shotsOnTargetAway};
+    var corners=st.corners||{h:st.cornersHome,a:st.cornersAway};
+    var yellow=st.yellow||{h:st.yellowHome,a:st.yellowAway};
+    if(poss&&poss.h!=null)html+='<span>Poss: '+poss.h+'% – '+poss.a+'%</span>';
+    if(shots&&shots.h!=null)html+='<span>Tirs: '+shots.h+(sot&&sot.h!=null?' ('+sot.h+')':'')+' – '+shots.a+(sot&&sot.a!=null?' ('+sot.a+')':'')+'</span>';
+    if(corners&&corners.h!=null)html+='<span>Corners: '+corners.h+' – '+corners.a+'</span>';
+    if(yellow&&yellow.h!=null)html+='<span>🟨 '+yellow.h+' – '+yellow.a+'</span>';
+    html+='</div>';
+  }
   return html;
 }
 
@@ -3390,10 +3413,9 @@ function buildScenario(match,pred,s){
   }
 
   // ── 5. Scores les plus probables (Poisson Dixon-Coles) ──
+  var v1Fav=domKey==='v1',v2Fav=domKey==='v2',xFav=domKey==='x';
   var lH=pred.moyBH?parseFloat(pred.moyBH):1.35;
   var lA=pred.moyBA?parseFloat(pred.moyBA):1.05;
-  // Ajustement directionnel selon le signal 1X2 pondéré
-  var v1Fav=domKey==='v1',v2Fav=domKey==='v2',xFav=domKey==='x';
   if(v1Fav&&v1W>=50){lH*=(1+Math.min(0.4,(v1W-50)/100));lA*=(1-Math.min(0.25,(v1W-50)/100));}
   else if(v2Fav&&v2W>=50){lA*=(1+Math.min(0.4,(v2W-50)/100));lH*=(1-Math.min(0.25,(v2W-50)/100));}
   else if(xFav&&xW>=45){lH=Math.max(0.5,lH*0.88);lA=Math.max(0.5,lA*0.88);}
@@ -3402,7 +3424,6 @@ function buildScenario(match,pred,s){
   var rawScores=getTopScores(pois.scoreMatrix,pois.tot,10);
   var scores=rawScores.map(function(sc){
     var w=sc.p;
-    // Pondération apprise
     if(sc.h>0)w*=SCORE_WEIGHTS.hmsc;
     if(sc.a>0)w*=SCORE_WEIGHTS.amsc;
     if(sc.h+sc.a>2.5)w*=SCORE_WEIGHTS.over;
@@ -4179,97 +4200,134 @@ function renderOddsStats(data){
 // ═══════════════════════════════════ SCORE PREDICTION ENGINE ═══
 var SCORE_WEIGHTS_KEY='fs_score_weights';
 var SCORE_WEIGHTS={v1:1.0,v2:1.0,x:1.0,btts:1.0,over:1.0,under:1.0,hmsc:1.0,amsc:1.0};
-function loadScoreWeights(){try{var w=JSON.parse(localStorage.getItem(SCORE_WEIGHTS_KEY));if(w&&Object.keys(w).length>=4)SCORE_WEIGHTS=w;}catch(e){}}
-function saveScoreWeights(w){SCORE_WEIGHTS=w;localStorage.setItem(SCORE_WEIGHTS_KEY,JSON.stringify(w));}
-
 // ═══════════════════════════════════ THESTATSAPI DUMP ENGINE ═══
 var STATS_BASE='https://api.thestatsapi.com/api';
-var STATS_DUMP_KEY='fs_statsapi_dump_v1';
+var STATS_DUMP_KEY='fs_statsapi_dump_v3';
 var _dumpRunning=false;
 var _dumpSaisons=3;
 var _dumpMode='enrich';
-var _dumpDataTypes=['matches','stats','xg','odds'];
-var _dumpLigues=['1','2','3','4','5'];
-
-var STATS_COMPETITIONS={
-  '1':{name:'Premier League',country:'England'},
-  '2':{name:'La Liga',country:'Spain'},
-  '3':{name:'Bundesliga',country:'Germany'},
-  '4':{name:'Serie A',country:'Italy'},
-  '5':{name:'Ligue 1',country:'France'},
-  '6':{name:'Eredivisie',country:'Netherlands'},
-  '7':{name:'Primeira Liga',country:'Portugal'},
-};
 
 function getDumpDB(){try{return JSON.parse(localStorage.getItem(STATS_DUMP_KEY)||'{}')}catch(e){return{}}}
-function setDumpDB(d){try{localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(d));}catch(e){showAl('dumpAl','er','Stockage plein — réduis le nombre de saisons');}}
+function setDumpDB(d){
+  try{localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(d));}
+  catch(e){showAl('dumpAl','er','Stockage plein — réduis les saisons ou efface le dump');}
+}
 
 function getStatsKey(){return cfg.statsApiKey||'';}
 
-async function statsApiCall(endpoint,params){
+async function statsCall(endpoint,params){
   var key=getStatsKey();
-  if(!key){throw new Error('Clé TheStatsAPI manquante — configure-la dans Config');}
-  var url=STATS_BASE+endpoint+'?'+Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
-  var resp=await fetch(url,{headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}});
+  if(!key)throw new Error('Clé TheStatsAPI manquante — configure-la dans Config');
+  var url=STATS_BASE+endpoint;
+  if(params&&Object.keys(params).length){
+    url+='?'+Object.keys(params).map(function(k){
+      return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
+    }).join('&');
+  }
+  var resp=await fetch(url,{
+    headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}
+  });
   if(!resp.ok){
-    if(resp.status===401)throw new Error('Clé API invalide ou expirée');
-    if(resp.status===429)throw new Error('Quota dépassé — attends quelques minutes');
+    if(resp.status===401||resp.status===403)throw new Error('Clé invalide ou expirée ('+resp.status+')');
+    if(resp.status===429)throw new Error('RATE_LIMIT');
+    if(resp.status===404)return null;
     throw new Error('Erreur API '+resp.status);
   }
   return resp.json();
 }
 
-function toggleDumpLigue(el){
-  var id=el.dataset.id;
-  el.classList.toggle('on');
-  if(el.classList.contains('on')){if(_dumpLigues.indexOf(id)<0)_dumpLigues.push(id);}
-  else{_dumpLigues=_dumpLigues.filter(function(x){return x!==id;});}
+// Throttle : 120 req/min → 1 req/500ms
+async function _throttle(nReq){
+  await new Promise(function(r){setTimeout(r,520);});
+}
+async function _throttleRateLimit(){
+  await new Promise(function(r){setTimeout(r,35000);});
 }
 
 function setDumpSaisons(n){
   _dumpSaisons=n;
   document.querySelectorAll('#dumpSaisonChips .chip').forEach(function(c){
-    c.classList.toggle('on',parseInt(c.textContent)===n);
+    c.classList.toggle('on',parseInt(c.dataset.val)===n);
   });
 }
-
-function toggleDumpData(el){
-  var t=el.dataset.type;
-  el.classList.toggle('on');
-  if(el.classList.contains('on')){if(_dumpDataTypes.indexOf(t)<0)_dumpDataTypes.push(t);}
-  else{_dumpDataTypes=_dumpDataTypes.filter(function(x){return x!==t;});}
-}
-
 function setDumpMode(m){
   _dumpMode=m;
   document.querySelectorAll('#dumpEnrichChips .chip').forEach(function(c){
-    c.classList.toggle('on',c.onclick.toString().indexOf("'"+m+"'")>=0);
+    c.classList.toggle('on',c.dataset.mode===m);
   });
 }
 
 function initDumpPanel(){
   var dump=getDumpDB();
   var nb=Object.keys(dump).length;
-  if(nb>0){
-    var out=document.getElementById('dumpOut');
-    out.innerHTML='<div class="card"><div style="font-size:.72rem;color:var(--g);font-family:var(--mono)">&#x2705; Base enrichie : '+nb+' entrées sauvegardées</div><button class="bsm" onclick="renderDumpStats()" style="margin-top:8px;width:100%;padding:8px;text-align:center">Voir les stats du dump</button><button class="bsm" onclick="if(confirm(\'Effacer le dump ?\'))clearDumpDB()" style="margin-top:5px;width:100%;padding:8px;text-align:center;color:var(--r);border-color:var(--r)">Effacer le dump</button></div>';
-    out.style.display='block';
-  }
-  var db=getDB();
-  var liguesBase=new Set();
-  Object.values(db).forEach(function(day){day.forEach(function(m){if(m.league)liguesBase.add(m.league);});});
-  window._liguesBase=Array.from(liguesBase);
+  if(nb>0){renderDumpStats();}
+  else{var out=document.getElementById('dumpOut');if(out)out.style.display='none';}
+}
+function clearDumpDB(){localStorage.removeItem(STATS_DUMP_KEY);showAl('dumpAl','ok','Dump effacé');initDumpPanel();}
+function stopDump(){_dumpRunning=false;}
+
+// ── Extracteur de stats depuis la réponse /matches/{id}/stats ──
+function extractStats(data){
+  if(!data)return null;
+  var ov=data.overview||{};
+  function g(obj){return obj&&obj.all?{h:obj.all.home,a:obj.all.away,h1:obj.first_half?obj.first_half.home:null,a1:obj.first_half?obj.first_half.away:null}:null;}
+  var xgRaw=g(ov.expected_goals);
+  var npxg=data.np_expected_goals?g(data.np_expected_goals):null;
+  return{
+    possession:g(ov.ball_possession),
+    xg:xgRaw,
+    npxg:npxg,
+    bigChances:g(ov.big_chances),
+    shots:g(ov.total_shots),
+    shotsOnTarget:g(ov.shots_on_target),
+    saves:g(ov.goalkeeper_saves),
+    corners:g(ov.corner_kicks),
+    fouls:g(ov.fouls),
+    yellow:g(ov.yellow_cards),
+    red:g(ov.red_cards),
+    passes:g(ov.passes),
+    accuratePasses:g(ov.accurate_passes),
+    tackles:g(ov.tackles),
+    // Shots détaillés
+    shotsInsideBox:data.shots?g(data.shots.shots_inside_box):null,
+    shotsOutsideBox:data.shots?g(data.shots.shots_outside_box):null,
+    blockedShots:data.shots?g(data.shots.blocked_shots):null,
+    // Attaque
+    bigChancesMissed:data.attack?g(data.attack.big_chances_missed):null,
+    touchesPenArea:data.attack?g(data.attack.touches_in_penalty_area):null,
+    offsides:data.attack?g(data.attack.offsides):null,
+    // Passes
+    accurateCrosses:data.passes?g(data.passes.accurate_crosses):null,
+    accurateLongBalls:data.passes?g(data.passes.accurate_long_balls):null,
+    // Défense
+    interceptions:data.defending?g(data.defending.interceptions):null,
+    clearances:data.defending?g(data.defending.clearances):null,
+    // GK
+    goalsPrevented:data.goalkeeping?g(data.goalkeeping.goals_prevented):null,
+  };
 }
 
-function clearDumpDB(){localStorage.removeItem(STATS_DUMP_KEY);showAl('dumpAl','ok','Dump effacé');initDumpPanel();}
-
-function stopDump(){_dumpRunning=false;}
+// ── Extracteur de cotes depuis /matches/{id}/odds ──
+function extractOdds(data){
+  if(!data||!data.bookmakers||!data.bookmakers.length)return null;
+  var out={};
+  data.bookmakers.forEach(function(bk){
+    var bName=bk.bookmaker;
+    var m=bk.markets||{};
+    out[bName]={};
+    if(m.match_odds){out[bName].v1x2={home:m.match_odds.home,draw:m.match_odds.draw,away:m.match_odds.away};}
+    if(m.btts){out[bName].btts={yes:m.btts.yes,no:m.btts.no};}
+    if(m.total_goals){out[bName].totals=m.total_goals;}
+    if(m.match_corners){out[bName].corners=m.match_corners;}
+    if(m.asian_handicap){out[bName].ah=m.asian_handicap;}
+  });
+  return out;
+}
 
 async function startDump(){
   if(_dumpRunning)return;
   var key=getStatsKey();
-  if(!key){showAl('dumpAl','er','Clé TheStatsAPI manquante — va dans Config');return;}
-  if(!_dumpLigues.length&&_dumpMode!=='enrich'){showAl('dumpAl','er','Sélectionne au moins une ligue');return;}
+  if(!key){showAl('dumpAl','er','Clé TheStatsAPI manquante — configure-la dans Config');return;}
 
   _dumpRunning=true;
   hideAl('dumpAl');
@@ -4283,155 +4341,245 @@ async function startDump(){
 
   var nMatches=0,nStats=0,nXg=0,nOdds=0,nReq=0;
   var dumpDB=getDumpDB();
-  var curYear=new Date().getFullYear();
-  var seasons=[];
-  for(var y=0;y<_dumpSaisons;y++) seasons.push(curYear-y);
 
   function upd(msg,pct){
     document.getElementById('dumpMsg').textContent=msg;
     document.getElementById('dumpPct').textContent=Math.round(pct)+'%';
     document.getElementById('dumpFill').style.width=Math.round(pct)+'%';
-    document.getElementById('dumpReqCount').textContent='Requêtes utilisées : '+nReq;
+    document.getElementById('dumpReqCount').textContent='Requêtes : '+nReq;
   }
 
-  upd('Découverte des compétitions...',2);
-  var compMap={};
-  try{
-    nReq++;
-    var compsResp=await statsApiCall('/football/competitions',{per_page:100});
-    if(compsResp&&compsResp.data){
-      compsResp.data.forEach(function(c){
-        compMap[c.name]=c.id;
-        compMap[(c.name||'').toLowerCase()]=c.id;
-      });
+  async function safeCall(endpoint,params){
+    while(true){
+      try{
+        nReq++;
+        await _throttle(nReq);
+        var r=await statsCall(endpoint,params);
+        return r;
+      }catch(e){
+        if(e.message==='RATE_LIMIT'){upd('Rate limit — attente 35s...',-1);await _throttleRateLimit();}
+        else throw e;
+      }
     }
-  }catch(e){showAl('dumpAl','er',e.message);finishDump(nMatches,nStats,nXg,nOdds,nReq);return;}
+  }
 
-  var compIds=[];
+  try{
 
   if(_dumpMode==='enrich'){
+    // ──────────────────────────────────────────────────────────
+    // MODE ENRICHISSEMENT : stats + xG + cotes sur matchs en base
+    // ──────────────────────────────────────────────────────────
     var db=getDB();
-    var liguesBase=new Set();
-    Object.values(db).forEach(function(day){day.forEach(function(m){if(m.league)liguesBase.add(m.league.toLowerCase());});});
-    liguesBase.forEach(function(lig){
-      var id=compMap[lig];
-      if(id&&compIds.indexOf(id)<0)compIds.push(id);
-    });
-    if(!compIds.length){
-      Object.values(compMap).slice(0,5).forEach(function(id){if(compIds.indexOf(id)<0)compIds.push(id);});
-    }
-  } else {
-    _dumpLigues.forEach(function(ligId){
-      var comp=STATS_COMPETITIONS[ligId];
-      if(comp){
-        var id=compMap[comp.name]||compMap[comp.name.toLowerCase()];
-        if(id&&compIds.indexOf(id)<0)compIds.push(id);
-      }
-    });
-  }
-
-  if(!compIds.length){showAl('dumpAl','er','Aucune compétition trouvée — vérifie ta clé et les noms de ligues');finishDump(nMatches,nStats,nXg,nOdds,nReq);return;}
-
-  var total=compIds.length*seasons.length;
-  var done=0;
-
-  for(var ci=0;ci<compIds.length&&_dumpRunning;ci++){
-    var compId=compIds[ci];
-    for(var si=0;si<seasons.length&&_dumpRunning;si++){
-      var season=seasons[si];
-      done++;
-      var pct=5+(done/total)*85;
-      upd('Comp. '+compId+' · Saison '+season+'...',pct);
-
-      try{
-        var page=1,hasMore=true;
-        while(hasMore&&_dumpRunning){
-          nReq++;
-          var resp=await statsApiCall('/football/matches',{
-            competition_id:compId,season:season,per_page:100,page:page,
-            include:'stats,xg'+((_dumpDataTypes.indexOf('odds')>=0)?',odds':'')
-          });
-          if(!resp||!resp.data||!resp.data.length){hasMore=false;break;}
-
-          resp.data.forEach(function(match){
-            if(!match.id)return;
-            var entry=dumpDB[match.id]||{};
-            entry.id=match.id;
-            entry.homeTeam=match.home_team&&match.home_team.name;
-            entry.awayTeam=match.away_team&&match.away_team.name;
-            entry.date=match.kickoff_utc?match.kickoff_utc.split('T')[0]:null;
-            entry.competition=match.competition&&match.competition.name;
-            entry.season=match.season;
-            entry.status=match.status;
-            if(match.home_score!==null&&match.home_score!==undefined){
-              entry.homeScore=match.home_score;entry.awayScore=match.away_score;
-              nMatches++;
-            }
-            if(match.stats&&_dumpDataTypes.indexOf('stats')>=0){
-              entry.stats={
-                possessionHome:match.stats.possession_home,
-                possessionAway:match.stats.possession_away,
-                shotsHome:match.stats.shots_home,
-                shotsAway:match.stats.shots_away,
-                shotsOnTargetHome:match.stats.shots_on_target_home,
-                shotsOnTargetAway:match.stats.shots_on_target_away,
-                cornersHome:match.stats.corners_home,
-                cornersAway:match.stats.corners_away,
-                yellowHome:match.stats.yellow_cards_home,
-                yellowAway:match.stats.yellow_cards_away,
-              };
-              nStats++;
-            }
-            if(match.xg&&_dumpDataTypes.indexOf('xg')>=0){
-              entry.xg={home:match.xg.home,away:match.xg.away,npxgHome:match.xg.npxg_home,npxgAway:match.xg.npxg_away};
-              nXg++;
-            }
-            if(match.odds&&_dumpDataTypes.indexOf('odds')>=0){
-              entry.odds=match.odds;
-              nOdds++;
-            }
-            dumpDB[match.id]=entry;
-          });
-
-          document.getElementById('dumpNMatches').textContent=nMatches;
-          document.getElementById('dumpNStats').textContent=nStats;
-          document.getElementById('dumpNXg').textContent=nXg;
-          document.getElementById('dumpNOdds').textContent=nOdds;
-
-          hasMore=resp.meta&&resp.meta.current_page<resp.meta.last_page;
-          page++;
-          if(nReq%10===0){await new Promise(function(r){setTimeout(r,300);});}
+    var toEnrich=[];
+    Object.values(db).forEach(function(day){
+      day.forEach(function(m){
+        if(TERM.indexOf(m.status)>=0&&!dumpDB[m.id]){
+          toEnrich.push(m);
         }
-        if(nMatches%500<100)setDumpDB(dumpDB);
-      }catch(e){
-        showAl('dumpAl','er','Erreur: '+e.message+' (comp '+compId+', saison '+season+')');
-        if(e.message.indexOf('Quota')>=0||e.message.indexOf('invalid')>=0){break;}
+      });
+    });
+
+    if(!toEnrich.length){
+      showAl('dumpAl','in','Tous les matchs terminés sont déjà enrichis.');
+      return finishDump(nMatches,nStats,nXg,nOdds,nReq);
+    }
+
+    var total=toEnrich.length,done=0;
+    upd('Enrichissement de '+total+' matchs...',2);
+
+    for(var i=0;i<toEnrich.length&&_dumpRunning;i++){
+      var m=toEnrich[i];
+      done++;
+      if(done%10===0)upd(m.home+' vs '+m.away,5+(done/total)*88);
+
+      var entry={id:m.id};
+
+      // Stats + xG
+      var statsResp=await safeCall('/football/matches/'+m.id+'/stats',{});
+      if(statsResp&&statsResp.data){
+        var s=extractStats(statsResp.data);
+        if(s){
+          entry.stats=s;
+          nStats++;
+          document.getElementById('dumpNStats').textContent=nStats;
+          if(s.xg&&(s.xg.h!==null)){
+            entry.xg={home:s.xg.h,away:s.xg.a,npxgHome:s.npxg?s.npxg.h:null,npxgAway:s.npxg?s.npxg.a:null};
+            nXg++;document.getElementById('dumpNXg').textContent=nXg;
+          }
+        }
+      }
+
+      // Cotes historiques
+      var oddsResp=await safeCall('/football/matches/'+m.id+'/odds',{});
+      if(oddsResp&&oddsResp.data){
+        var o=extractOdds(oddsResp.data);
+        if(o){entry.odds=o;nOdds++;document.getElementById('dumpNOdds').textContent=nOdds;}
+      }
+
+      dumpDB[m.id]=entry;
+      nMatches++;document.getElementById('dumpNMatches').textContent=nMatches;
+      if(done%25===0)setDumpDB(dumpDB);
+    }
+
+    // Injecter dans la base locale
+    upd('Injection en base...',95);
+    var injected=0;
+    Object.keys(db).forEach(function(date){
+      db[date].forEach(function(m){
+        var e=dumpDB[m.id];
+        if(e){
+          if(e.stats)m._stats=e.stats;
+          if(e.xg)m._xg=e.xg;
+          if(e.odds)m._statsApiOdds=e.odds;
+          injected++;
+        }
+      });
+    });
+    var db2=getDB();Object.keys(db).forEach(function(d){db2[d]=db[d];});setDB(db2);
+    showAl('dumpAl','ok','✅ '+injected+' matchs enrichis · '+nStats+' stats · '+nXg+' xG · '+nOdds+' cotes');
+
+  }else{
+    // ──────────────────────────────────────────────────────────
+    // MODE DUMP MASSIF : compétitions → saisons → matchs → stats
+    // ──────────────────────────────────────────────────────────
+    upd('Récupération des compétitions...',2);
+    var compsResp=await safeCall('/football/competitions',{per_page:100,type:'league'});
+    if(!compsResp||!compsResp.data||!compsResp.data.length){
+      showAl('dumpAl','er','Impossible de récupérer les compétitions — vérifie ta clé');
+      return finishDump(nMatches,nStats,nXg,nOdds,nReq);
+    }
+
+    // Matcher avec les ligues en base
+    var mainDB=getDB();
+    var liguesBase=new Set();
+    Object.values(mainDB).forEach(function(day){
+      day.forEach(function(m){if(m.league)liguesBase.add(m.league.toLowerCase().trim());});
+    });
+
+    var TOP=['premier league','la liga','bundesliga','serie a','ligue 1','eredivisie','primeira liga','champions league','europa league'];
+    var targetComps=compsResp.data.filter(function(c){
+      var n=(c.name||'').toLowerCase();
+      return liguesBase.has(n)||TOP.some(function(t){return n.indexOf(t)>=0;});
+    });
+    if(!targetComps.length)targetComps=compsResp.data.slice(0,5);
+    // Filtrer sur les compétitions qui ont xG/stats/odds si possible
+    var withXg=targetComps.filter(function(c){return c.xg_available&&c.has_team_stats;});
+    if(withXg.length)targetComps=withXg;
+
+    upd(targetComps.length+' compétitions ciblées — saisons...',5);
+
+    // Récupérer les saisons
+    var compSeasons=[];
+    for(var ci=0;ci<targetComps.length&&_dumpRunning;ci++){
+      var comp=targetComps[ci];
+      var sResp=await safeCall('/football/competitions/'+comp.id+'/seasons',{});
+      if(sResp&&sResp.data){
+        sResp.data.slice(0,_dumpSaisons).forEach(function(s){
+          compSeasons.push({comp:comp,season:s});
+        });
       }
     }
-  }
 
-  if(_dumpRunning&&_dumpMode==='enrich'){
-    upd('Enrichissement de la base...',93);
-    var mainDB=getDB();var enriched=0;
-    Object.values(dumpDB).forEach(function(entry){
-      if(!entry.homeTeam||!entry.date)return;
-      var dayMs=mainDB[entry.date]||[];
-      var match=dayMs.find(function(m){return teamMatch(m.home,entry.homeTeam)&&teamMatch(m.away,entry.awayTeam);});
-      if(match){
-        if(entry.stats)match._stats=entry.stats;
-        if(entry.xg)match._xg=entry.xg;
-        if(entry.odds)match._statsApiOdds=entry.odds;
-        match._statsApiId=entry.id;
-        enriched++;
+    var totalPairs=compSeasons.length,donePairs=0;
+    var allMatchIds=[];
+
+    // Collecter les matchs terminés
+    for(var pci=0;pci<compSeasons.length&&_dumpRunning;pci++){
+      var cs=compSeasons[pci];donePairs++;
+      upd(cs.comp.name+' · '+cs.season.name,8+(donePairs/totalPairs)*25);
+
+      var page=1,hasMore=true;
+      while(hasMore&&_dumpRunning){
+        var fxResp=await safeCall('/football/matches',{
+          competition_id:cs.comp.id,season_id:cs.season.id,
+          status:'finished',per_page:100,page:page
+        });
+        if(!fxResp||!fxResp.data||!fxResp.data.length){hasMore=false;break;}
+        fxResp.data.forEach(function(m){
+          if(!m.id||dumpDB[m.id])return;
+          dumpDB[m.id]={
+            id:m.id,
+            homeTeam:m.home_team&&(m.home_team.name),
+            awayTeam:m.away_team&&(m.away_team.name),
+            date:m.utc_date?m.utc_date.split('T')[0]:null,
+            competition:cs.comp.name,season:cs.season.name,
+            homeScore:m.score&&m.score.home,
+            awayScore:m.score&&m.score.away,
+            hasXg:!!m.xg_available,
+            hasOdds:!!m.odds_available,
+          };
+          allMatchIds.push({id:m.id,hasXg:!!m.xg_available,hasOdds:!!m.odds_available});
+          nMatches++;
+        });
+        document.getElementById('dumpNMatches').textContent=nMatches;
+        hasMore=fxResp.meta&&fxResp.meta.page<fxResp.meta.total_pages;
+        page++;
+        if(nMatches%200===0)setDumpDB(dumpDB);
       }
+    }
+
+    setDumpDB(dumpDB);
+    upd('Matchs collectés : '+nMatches+' · Enrichissement stats...',35);
+
+    // Prioriser les matchs en base locale
+    var localIds=new Set();
+    Object.values(mainDB).forEach(function(day){day.forEach(function(m){localIds.add(m.id);});});
+    allMatchIds.sort(function(a,b){var aL=localIds.has(a.id)?0:1,bL=localIds.has(b.id)?0:1;return aL-bL;});
+
+    var totalEnrich=allMatchIds.length,doneEnrich=0;
+    for(var mi=0;mi<allMatchIds.length&&_dumpRunning;mi++){
+      var mid=allMatchIds[mi];
+      doneEnrich++;
+      if(doneEnrich%20===0){
+        upd('Stats '+doneEnrich+'/'+totalEnrich,35+(doneEnrich/totalEnrich)*55);
+        setDumpDB(dumpDB);
+      }
+
+      // Stats + xG
+      var sr=await safeCall('/football/matches/'+mid.id+'/stats',{});
+      if(sr&&sr.data){
+        var st=extractStats(sr.data);
+        if(st){
+          dumpDB[mid.id].stats=st;
+          nStats++;document.getElementById('dumpNStats').textContent=nStats;
+          if(st.xg&&st.xg.h!==null){
+            dumpDB[mid.id].xg={home:st.xg.h,away:st.xg.a,npxgHome:st.npxg?st.npxg.h:null,npxgAway:st.npxg?st.npxg.a:null};
+            nXg++;document.getElementById('dumpNXg').textContent=nXg;
+          }
+        }
+      }
+
+      // Cotes (seulement si disponibles)
+      if(mid.hasOdds){
+        var or=await safeCall('/football/matches/'+mid.id+'/odds',{});
+        if(or&&or.data){
+          var ods=extractOdds(or.data);
+          if(ods){dumpDB[mid.id].odds=ods;nOdds++;document.getElementById('dumpNOdds').textContent=nOdds;}
+        }
+      }
+    }
+
+    // Injecter en base locale
+    upd('Injection en base locale...',93);
+    var injected=0;
+    Object.keys(mainDB).forEach(function(date){
+      mainDB[date].forEach(function(m){
+        var e=dumpDB[m.id];
+        if(e){
+          if(e.stats)m._stats=e.stats;
+          if(e.xg)m._xg=e.xg;
+          if(e.odds)m._statsApiOdds=e.odds;
+          injected++;
+        }
+      });
     });
-    Object.keys(mainDB).forEach(function(d){
-      var updated=mainDB[d].some(function(m){return m._stats||m._xg;});
-      if(updated){var db2=getDB();db2[d]=mainDB[d];setDB(db2);}
-    });
-    upd(enriched+' matchs enrichis !',98);
+    var db3=getDB();Object.keys(mainDB).forEach(function(d){db3[d]=mainDB[d];});setDB(db3);
+    showAl('dumpAl','ok','✅ Dump terminé — '+nMatches+' matchs · '+nStats+' stats · '+nXg+' xG · '+nOdds+' cotes · '+injected+' injectés en base');
   }
 
+  }catch(e){
+    showAl('dumpAl','er','Erreur : '+e.message);
+  }
   setDumpDB(dumpDB);
   finishDump(nMatches,nStats,nXg,nOdds,nReq);
 }
@@ -4440,35 +4588,28 @@ function finishDump(nMatches,nStats,nXg,nOdds,nReq){
   _dumpRunning=false;
   document.getElementById('btnDump').disabled=false;
   document.getElementById('btnDumpStop').style.display='none';
-  document.getElementById('dumpPct').textContent='100%';
-  document.getElementById('dumpFill').style.width='100%';
-  document.getElementById('dumpReqCount').textContent='Total requêtes utilisées : '+nReq;
+  document.getElementById('dumpReqCount').textContent='Total requêtes : '+nReq;
   renderDumpStats();
 }
 
 function renderDumpStats(){
   var dump=getDumpDB();
   var entries=Object.values(dump);
-  if(!entries.length){document.getElementById('dumpOut').style.display='none';return;}
+  if(!entries.length){var out=document.getElementById('dumpOut');if(out)out.style.display='none';return;}
   var withStats=entries.filter(function(e){return e.stats;}).length;
   var withXg=entries.filter(function(e){return e.xg;}).length;
   var withOdds=entries.filter(function(e){return e.odds;}).length;
-  var withScore=entries.filter(function(e){return e.homeScore!==undefined;}).length;
-  var html='<div class="card">';
-  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">DUMP SAUVEGARDÉ</div>';
-  html+='<div class="sg g2">';
-  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+entries.length+'</div><div class="sl">Entrées</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+withScore+'</div><div class="sl">Avec score</div></div>';
-  html+='</div>';
-  html+='<div class="sg g3" style="margin-top:8px">';
-  html+='<div class="sb"><div class="sv" style="color:var(--b);font-size:.9rem">'+withStats+'</div><div class="sl">Stats match</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--p);font-size:.9rem">'+withXg+'</div><div class="sl">xG</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--y);font-size:.9rem">'+withOdds+'</div><div class="sl">Cotes hist.</div></div>';
-  html+='</div>';
   var comps=new Set(entries.map(function(e){return e.competition||'?';}));
-  html+='<div style="margin-top:8px;font-size:.62rem;color:var(--dm);font-family:var(--mono)">Compétitions : '+Array.from(comps).slice(0,6).join(', ')+(comps.size>6?' (+'+(comps.size-6)+')':'')+'</div>';
-  html+='<button class="bsm" onclick="injectDumpIntoMatchCards()" style="margin-top:8px;width:100%;padding:8px;text-align:center;color:var(--teal);border-color:var(--teal)">&#x21A9; Injecter dans les matchs actuels</button>';
-  html+='<button class="bsm" onclick="if(confirm(\'Effacer le dump ?\'))clearDumpDB()" style="margin-top:5px;width:100%;padding:8px;text-align:center;color:var(--r);border-color:var(--r)">Effacer</button>';
+  var html='<div class="card">';
+  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">DUMP SAUVEGARDÉ — '+Array.from(comps).slice(0,4).join(', ')+(comps.size>4?' +'+(comps.size-4):'')+'</div>';
+  html+='<div class="sg g4" style="margin-bottom:10px">';
+  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+entries.length+'</div><div class="sl">Matchs</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+withStats+'</div><div class="sl">Stats</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--p)">'+withXg+'</div><div class="sl">xG</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--y)">'+withOdds+'</div><div class="sl">Cotes hist.</div></div>';
+  html+='</div>';
+  html+='<button class="bsm" onclick="injectDumpIntoMatchCards()" style="width:100%;padding:8px;text-align:center;color:var(--teal,#20c997);border-color:var(--teal,#20c997)">↩ Injecter dans les matchs ouverts</button>';
+  html+='<button class="bsm" onclick="if(confirm(\'Effacer le dump ?\'))clearDumpDB()" style="margin-top:5px;width:100%;padding:8px;text-align:center;color:var(--r);border-color:var(--r)">Effacer le dump</button>';
   html+='</div>';
   var out=document.getElementById('dumpOut');out.innerHTML=html;out.style.display='block';
 }
@@ -4479,9 +4620,10 @@ function injectDumpIntoMatchCards(){
   var injected=0;
   allMatchsCache.forEach(function(m){
     var entry=dump[m.id]||null;
-    if(!entry&&m.date){
+    if(!entry){
+      var d=m.date||document.getElementById('tdDate').value;
       entry=Object.values(dump).find(function(e){
-        return e.date===m.date&&teamMatch(m.home,e.homeTeam)&&teamMatch(m.away,e.awayTeam);
+        return e.date===d&&teamMatch(m.home,e.homeTeam)&&teamMatch(m.away,e.awayTeam);
       })||null;
     }
     if(entry){
@@ -4492,8 +4634,10 @@ function injectDumpIntoMatchCards(){
     }
   });
   if(injected){renderMatchsList();showAl('dumpAl','ok',injected+' matchs enrichis avec stats/xG/cotes');}
-  else showAl('dumpAl','in','Aucun match correspondant trouvé');
+  else showAl('dumpAl','in','Aucun match correspondant trouvé dans le dump');
 }
+function loadScoreWeights(){try{var w=JSON.parse(localStorage.getItem(SCORE_WEIGHTS_KEY));if(w&&Object.keys(w).length>=4)SCORE_WEIGHTS=w;}catch(e){}}
+function saveScoreWeights(w){SCORE_WEIGHTS=w;localStorage.setItem(SCORE_WEIGHTS_KEY,JSON.stringify(w));}
 
 // ═══════════════════════════════════ ODDS FILTERS ═══
 var oddsEdgeSeuil=5;
@@ -5407,6 +5551,134 @@ function calc00(){
   out.innerHTML=html;out.style.display='block';
 }
 
+// ═══════════════════════════════════ BILAN SÉLECTION ═══
+function renderBilanSelection(entries,s){
+  // Reconstituer le score composite pour chaque entrée du tracking
+  var calib=getCalib();
+  var mkts=getSelMkts(s);
+
+  // Map predKey (pred object keys) -> tracking keys (pPlus, pV1 etc)
+  var predToTrack={plus:'pPlus',under:'pUnder',btts:'pBtts',bttsNon:'pBttsNon',
+    v1:'pV1',x:'pX',v2:'pV2',csH:'pCsH',csA:'pCsA',hmsc:'pHmsc',amsc:'pAmsc',
+    dc1x:'pDc1x',dcx2:'pDcx2',dc12:'pDc12'};
+
+  // Pour chaque entrée trackée, recalculer le score composite qu'elle aurait eu
+  var withScore=entries.filter(function(t){
+    return t.pPlus!==null||t.pV1!==null||t.pBtts!==null;
+  }).map(function(t){
+    var totalScore=0,nSignals=0;
+    var triggers=[];
+    mkts.forEach(function(mk){
+      var trackKey=predToTrack[mk.predKey];
+      var predPct=trackKey?t[trackKey]:null;
+      if(predPct===null||predPct===undefined)return;
+      if(predPct<60)return;
+      var fiabData=calib[mk.fiabKey||mk.id]||null;
+      var fiabPct=fiabData&&fiabData.prec!==undefined?fiabData.prec:null;
+      var fiabW=fiabPct!==null?fiabPct/100:0.60;
+      var predBonus=predPct>=80?1.2:predPct>=75?1.1:1.0;
+      var score=predPct*fiabW*predBonus;
+      triggers.push({label:mk.label,predPct:predPct,score:Math.round(score),mktId:mk.id});
+      totalScore+=score;nSignals++;
+    });
+    if(!nSignals)return null;
+    var composite=Math.round(totalScore/nSignals);
+    // Résultat réel : au moins un marché déclenché était correct ?
+    var anyCorrect=triggers.some(function(tr){
+      var mkt=mkts.find(function(m){return m.id===tr.mktId;});
+      return mkt&&getRealVal(t,mkt);
+    });
+    return{t:t,composite:composite,nSignals:nSignals,triggers:triggers,correct:anyCorrect};
+  }).filter(Boolean);
+
+  if(withScore.length<3){
+    return '<div style="font-size:.7rem;color:var(--dm);padding:14px;text-align:center;font-family:var(--mono)">Pas assez de données ('+withScore.length+' entrées avec score). Lance la Sync globale d\'abord.</div>';
+  }
+
+  // Grouper par tranche de score composite
+  var tranches=[
+    {lbl:'90+',min:90,max:999},
+    {lbl:'80-89',min:80,max:89},
+    {lbl:'70-79',min:70,max:79},
+    {lbl:'60-69',min:60,max:69},
+    {lbl:'<60',min:0,max:59}
+  ].map(function(tr){return Object.assign({n:0,ok:0},tr);});
+
+  withScore.forEach(function(item){
+    tranches.forEach(function(tr){
+      if(item.composite>=tr.min&&item.composite<=tr.max){tr.n++;if(item.correct)tr.ok++;}
+    });
+  });
+
+  var html='';
+
+  // Résumé global
+  var totalN=withScore.length;
+  var totalOk=withScore.filter(function(x){return x.correct;}).length;
+  var globalRate=Math.round(totalOk/totalN*100);
+  var globalCol=globalRate>=65?'var(--g)':globalRate>=50?'var(--y)':'var(--r)';
+
+  html+='<div class="card" style="margin-bottom:8px">';
+  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">BILAN SÉLECTION DU JOUR</div>';
+  html+='<div class="sg g3" style="margin-bottom:10px">';
+  html+='<div class="sb"><div class="sv" style="color:'+globalCol+'">'+globalRate+'%</div><div class="sl">Taux global</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+totalOk+'</div><div class="sl">Corrects</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--dm)">'+totalN+'</div><div class="sl">Matchs</div></div>';
+  html+='</div>';
+  html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono)">Matchs avec ≥1 signal à 60%+ sur au moins un marché</div>';
+  html+='</div>';
+
+  // Par tranche de score composite
+  var activeTranches=tranches.filter(function(tr){return tr.n>=1;});
+  if(activeTranches.length){
+    html+='<div class="card" style="margin-bottom:8px">';
+    html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">PRÉCISION PAR SCORE COMPOSITE</div>';
+    html+='<div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Le score composite = pred% × fiabilité marché × bonus. Plus il est élevé, mieux le match devrait être sélectionné.</div>';
+    html+='<div class="bars">';
+    activeTranches.forEach(function(tr){
+      var rate=Math.round(tr.ok/tr.n*100);
+      var col=rate>=65?'var(--g)':rate>=50?'var(--y)':'var(--r)';
+      html+='<div class="br2">';
+      html+='<div class="bn" style="width:60px;font-weight:700">'+tr.lbl+'</div>';
+      html+='<div class="bb2"><div class="bf" style="width:'+Math.min(100,rate)+'%;background:'+col+'">'+rate+'% ('+tr.ok+'/'+tr.n+')</div></div>';
+      html+='</div>';
+    });
+    html+='</div>';
+    // Meilleure tranche
+    var bestTr=activeTranches.filter(function(t){return t.n>=3;}).sort(function(a,b){return Math.round(b.ok/b.n*100)-Math.round(a.ok/a.n*100);})[0];
+    if(bestTr){
+      html+='<div style="margin-top:8px;font-size:.62rem;font-family:var(--mono);color:var(--g)">✅ Meilleure tranche : score '+bestTr.lbl+' → '+Math.round(bestTr.ok/bestTr.n*100)+'% de réussite ('+bestTr.n+' matchs)</div>';
+    }
+    html+='</div>';
+  }
+
+  // Top marchés les plus déclenchés et leur précision
+  var mktStats2={};
+  withScore.forEach(function(item){
+    item.triggers.forEach(function(tr){
+      if(!mktStats2[tr.mktId])mktStats2[tr.mktId]={label:tr.label,n:0,ok:0};
+      mktStats2[tr.mktId].n++;
+      var mkt=mkts.find(function(m){return m.id===tr.mktId;});
+      if(mkt&&getRealVal(item.t,mkt))mktStats2[tr.mktId].ok++;
+    });
+  });
+  var mktArr=Object.values(mktStats2).filter(function(m){return m.n>=3;}).sort(function(a,b){return b.n-a.n;}).slice(0,8);
+  if(mktArr.length){
+    html+='<div class="card">';
+    html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:8px">MARCHÉS LES PLUS SÉLECTIONNÉS</div>';
+    html+='<div class="tbl"><table><thead><tr><th>Marché</th><th>Sél.</th><th>Corrects</th><th>Taux</th></tr></thead><tbody>';
+    mktArr.forEach(function(m){
+      var rate=Math.round(m.ok/m.n*100);
+      var cl=rate>=65?'tg':rate>=50?'ty':'tr';
+      html+='<tr><td style="font-size:.65rem">'+m.label+'</td><td>'+m.n+'</td><td>'+m.ok+'</td><td class="'+cl+'">'+rate+'%</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    html+='</div>';
+  }
+
+  return html;
+}
+
 // ═══════════════════════════════════ SYNC GLOBALE ═══
 var _syncRunning=false;
 function stopSync(){_syncRunning=false;}
@@ -5543,6 +5815,7 @@ function calcFiabilite(){
 }
 function renderFiabOut(){
   try{
+  ensureScoresTab();
   var entries=getTrack(),s=seuilFiab;if(!entries.length)return;
   var newCalib=getCalib(),calibApplied=Object.keys(newCalib).length>0;
   var gc=buildFiabGlobalCache(entries,s);
@@ -5551,7 +5824,7 @@ function renderFiabOut(){
   var savedTk=getTickets(),tkWon=savedTk.filter(function(t){return t.result==='won'}).length;
   var tkLost=savedTk.filter(function(t){return t.result==='lost'}).length,tkTotal=tkWon+tkLost;
   var html='';
-  html+='<div class="fiab-tabs"><button class="fiab-tab'+(fiabView==='resume'?' on':'')+'" data-v="resume" onclick="setFiabView(\'resume\')">Résumé</button><button class="fiab-tab'+(fiabView==='marches'?' on':'')+'" data-v="marches" onclick="setFiabView(\'marches\')">Marchés</button><button class="fiab-tab'+(fiabView==='analyse'?' on':'')+'" data-v="analyse" onclick="setFiabView(\'analyse\')">Analyse</button><button class="fiab-tab'+(fiabView==='roi'?' on':'')+'" data-v="roi" onclick="setFiabView(\'roi\')">ROI</button><button class="fiab-tab'+(fiabView==='tranches'?' on':'')+'" data-v="tranches" onclick="setFiabView(\'tranches\')">Tranches</button><button class="fiab-tab'+(fiabView==='scores'?' on':'')+'" data-v="scores" onclick="setFiabView(\'scores\')">Scores</button></div>';
+  html+='<div class="fiab-tabs"><button class="fiab-tab'+(fiabView==='resume'?' on':'')+'" data-v="resume" onclick="setFiabView(\'resume\')">Résumé</button><button class="fiab-tab'+(fiabView==='marches'?' on':'')+'" data-v="marches" onclick="setFiabView(\'marches\')">Marchés</button><button class="fiab-tab'+(fiabView==='analyse'?' on':'')+'" data-v="analyse" onclick="setFiabView(\'analyse\')">Analyse</button><button class="fiab-tab'+(fiabView==='roi'?' on':'')+'" data-v="roi" onclick="setFiabView(\'roi\')">ROI</button><button class="fiab-tab'+(fiabView==='tranches'?' on':'')+'" data-v="tranches" onclick="setFiabView(\'tranches\')">Tranches</button><button class="fiab-tab'+(fiabView==='scores'?' on':'')+'" data-v="scores" onclick="setFiabView(\'scores\')">Scores</button><button class="fiab-tab'+(fiabView==='selection'?' on':'')+'" data-v="selection" onclick="setFiabView(\'selection\')">Sélection</button></div>';
   if(calibApplied){html+='<div style="background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:.64rem;line-height:1.7"><div style="font-weight:700;color:var(--g);margin-bottom:2px">⚡ Auto-calibration active</div><div style="color:var(--dm);font-family:var(--mono)">'+Object.entries(newCalib).map(function(e){var f=e[1],mkt=mkts.find(function(m){return m.id===e[0]});return'<span style="margin-right:5px">'+(mkt?mkt.label:e[0])+' '+(f>1.05?'↑':f<0.95?'↓':'≈')+'×'+f+'</span>'}).join('')+'</div></div>'}
   function accBox(id,lbl){var st=mktStats[id];if(!st||st.acc===null)return'<div class="sb"><div class="sv" style="color:var(--dm)">?</div><div class="sl">'+lbl+'</div></div>';var col=st.acc>=60?'var(--g)':st.acc>=45?'var(--y)':'var(--r)';return'<div class="sb"><div class="sv" style="color:'+col+'">'+st.acc+'%</div><div class="sl">'+lbl+'</div></div>'}
   if(fiabView==='resume'){
@@ -5653,8 +5926,11 @@ function renderFiabOut(){
     if(scoreStats){
       html+=renderScorePrecision(scoreStats)||'';
     } else {
-      html+='<div style="font-size:.7rem;color:var(--dm);padding:14px;text-align:center;font-family:var(--mono)">Pas assez de donn&#xe9;es — Lance la Sync globale puis ouvre quelques sc&#xe9;narios de matchs pour alimenter les pr&#xe9;dictions de score.</div>';
+      html+='<div style="font-size:.7rem;color:var(--dm);padding:14px;text-align:center;font-family:var(--mono)">Pas assez de données — Lance la Sync globale puis ouvre quelques scénarios de matchs pour alimenter les prédictions de score.</div>';
     }
+  }
+  else if(fiabView==='selection'){
+    html+=renderBilanSelection(entries,s)||'';
   }
   html+='<div class="sg g2" style="margin-top:12px"><button class="bsm" onclick="exportTrack()" style="padding:9px;text-align:center">Exporter JSON</button><button class="bsm" onclick="clearTrack()" style="padding:9px;text-align:center;color:var(--r);border-color:var(--r)">Effacer tracking</button></div>';
   var out=document.getElementById('fiabOut');out.innerHTML=html;out.style.display='block';
