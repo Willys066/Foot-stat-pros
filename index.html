@@ -1176,26 +1176,26 @@ tr:hover td{background:var(--s2)}
     </div>
 
     <div style="margin-bottom:10px">
-      <div class="lsm">Mode</div>
-      <div class="chips" id="dumpEnrichChips">
-        <div class="chip on" data-mode="enrich" onclick="setDumpMode('enrich')">Enrichir matchs existants</div>
-        <div class="chip" data-mode="all" onclick="setDumpMode('all')">Dump massif (ligues + saisons)</div>
+      <div class="lsm">Données à collecter</div>
+      <div class="chips" id="dumpModeChips">
+        <div class="chip on" data-mode="scores" onclick="setDumpMode('scores')">Scores uniquement</div>
+        <div class="chip" data-mode="scores+xg" onclick="setDumpMode('scores+xg')">Scores + xG</div>
       </div>
       <div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-top:5px;line-height:1.5">
-        <b>Enrichissement</b> : stats/xG/cotes sur les matchs déjà en base. Rapide, économise les requêtes.<br>
-        <b>Dump massif</b> : collecte tout — matchs + stats + xG + cotes · ligues de ta base × N saisons.
+        <b>Scores</b> : collecte rapide — 1 req/100 matchs. Idéal pour alimenter le tracking.<br>
+        <b>Scores + xG</b> : ajoute 1 req/match avec xG disponible. Plus lent mais enrichit les prédictions.
       </div>
     </div>
 
     <div style="margin-bottom:12px">
-      <div class="lsm">Nombre de saisons (dump massif)</div>
+      <div class="lsm">Nombre de saisons</div>
       <div class="chips" id="dumpSaisonChips">
         <div class="chip" data-val="1" onclick="setDumpSaisons(1)">1 an</div>
         <div class="chip on" data-val="3" onclick="setDumpSaisons(3)">3 ans</div>
         <div class="chip" data-val="5" onclick="setDumpSaisons(5)">5 ans</div>
         <div class="chip" data-val="10" onclick="setDumpSaisons(10)">10 ans</div>
       </div>
-      <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:4px">3 ans × 5 ligues ≈ 15-20k req (matchs + stats + cotes)</div>
+      <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:4px">3 ans × 5 ligues ≈ ~200 req (scores) · ~3000 req (scores+xG)</div>
     </div>
 
     <button id="btnDump" class="btn bb" onclick="startDump()" style="margin-bottom:7px">&#x1F4E5; Lancer le dump</button>
@@ -1212,11 +1212,9 @@ tr:hover td{background:var(--s2)}
         <span id="dumpPct" style="color:var(--g);font-weight:700">0%</span>
       </div>
       <div class="lb"><div class="lf" id="dumpFill" style="width:0%"></div></div>
-      <div class="sg g4" style="margin-top:8px">
+      <div class="sg g2" style="margin-top:8px">
         <div class="sb"><div class="sv" id="dumpNMatches" style="color:var(--g);font-size:.9rem">0</div><div class="sl">Matchs</div></div>
-        <div class="sb"><div class="sv" id="dumpNStats" style="color:var(--b);font-size:.9rem">0</div><div class="sl">Stats</div></div>
         <div class="sb"><div class="sv" id="dumpNXg" style="color:var(--p);font-size:.9rem">0</div><div class="sl">xG</div></div>
-        <div class="sb"><div class="sv" id="dumpNOdds" style="color:var(--y);font-size:.9rem">0</div><div class="sl">Cotes hist.</div></div>
       </div>
       <div id="dumpReqCount" style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:6px">Requêtes : 0</div>
     </div>
@@ -3023,22 +3021,22 @@ function buildMatchHTML(m,pred,s){
   if(m._xg&&(m._xg.home!==null||m._xg.away!==null)){
     html+='<div style="display:flex;gap:8px;margin-top:5px;font-size:.58rem;font-family:var(--mono)">';
     html+='<span style="color:var(--p)">xG: '+(m._xg.home!==null?parseFloat(m._xg.home).toFixed(2):'?')+' – '+(m._xg.away!==null?parseFloat(m._xg.away).toFixed(2):'?')+'</span>';
-    if(m._xg.npxgHome!==null&&m._xg.npxgHome!==undefined)html+='<span style="color:var(--dm)">npxG: '+parseFloat(m._xg.npxgHome).toFixed(2)+' – '+parseFloat(m._xg.npxgAway).toFixed(2)+'</span>';
+    if(m._xg.npxgHome!=null)html+='<span style="color:var(--dm)">npxG: '+parseFloat(m._xg.npxgHome).toFixed(2)+' – '+parseFloat(m._xg.npxgAway).toFixed(2)+'</span>';
     html+='</div>';
   }
   if(m._stats){
     var st=m._stats;
+    // Support ancienne structure (possessionHome) et nouvelle (pos.h)
+    var pos=st.pos||(st.possessionHome!=null?{h:st.possessionHome,a:st.possessionAway}:null);
+    var sh=st.sh||(st.shotsHome!=null?{h:st.shotsHome,a:st.shotsAway}:null);
+    var sot=st.sot||(st.shotsOnTargetHome!=null?{h:st.shotsOnTargetHome,a:st.shotsOnTargetAway}:null);
+    var co=st.co||(st.cornersHome!=null?{h:st.cornersHome,a:st.cornersAway}:null);
+    var yc=st.yc||(st.yellowHome!=null?{h:st.yellowHome,a:st.yellowAway}:null);
     html+='<div style="display:flex;gap:8px;margin-top:4px;font-size:.55rem;font-family:var(--mono);color:var(--dm);flex-wrap:wrap">';
-    // Nouvelle structure: st.possession.h, st.shots.h, st.corners.h
-    var poss=st.possession||{h:st.possessionHome,a:st.possessionAway};
-    var shots=st.shots||{h:st.shotsHome,a:st.shotsAway};
-    var sot=st.shotsOnTarget||{h:st.shotsOnTargetHome,a:st.shotsOnTargetAway};
-    var corners=st.corners||{h:st.cornersHome,a:st.cornersAway};
-    var yellow=st.yellow||{h:st.yellowHome,a:st.yellowAway};
-    if(poss&&poss.h!=null)html+='<span>Poss: '+poss.h+'% – '+poss.a+'%</span>';
-    if(shots&&shots.h!=null)html+='<span>Tirs: '+shots.h+(sot&&sot.h!=null?' ('+sot.h+')':'')+' – '+shots.a+(sot&&sot.a!=null?' ('+sot.a+')':'')+'</span>';
-    if(corners&&corners.h!=null)html+='<span>Corners: '+corners.h+' – '+corners.a+'</span>';
-    if(yellow&&yellow.h!=null)html+='<span>🟨 '+yellow.h+' – '+yellow.a+'</span>';
+    if(pos&&pos.h!=null)html+='<span>Poss: '+pos.h+'%–'+pos.a+'%</span>';
+    if(sh&&sh.h!=null)html+='<span>Tirs: '+sh.h+(sot&&sot.h!=null?' ('+sot.h+')':'')+' – '+sh.a+(sot&&sot.a!=null?' ('+sot.a+')':'')+'</span>';
+    if(co&&co.h!=null)html+='<span>Corn: '+co.h+' – '+co.a+'</span>';
+    if(yc&&yc.h!=null)html+='<span>🟨 '+yc.h+' – '+yc.a+'</span>';
     html+='</div>';
   }
   return html;
@@ -4202,31 +4200,36 @@ var SCORE_WEIGHTS_KEY='fs_score_weights';
 var SCORE_WEIGHTS={v1:1.0,v2:1.0,x:1.0,btts:1.0,over:1.0,under:1.0,hmsc:1.0,amsc:1.0};
 // ═══════════════════════════════════ THESTATSAPI DUMP ENGINE ═══
 var STATS_BASE='https://api.thestatsapi.com/api';
-var STATS_DUMP_KEY='fs_statsapi_dump_v3';
+var STATS_DUMP_KEY='fs_statsapi_dump_v5';
 var _dumpRunning=false;
 var _dumpSaisons=3;
-var _dumpMode='enrich';
+var _dumpMode='scores'; // 'scores' ou 'scores+xg'
 
 function getDumpDB(){try{return JSON.parse(localStorage.getItem(STATS_DUMP_KEY)||'{}')}catch(e){return{}}}
 function setDumpDB(d){
-  try{localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(d));}
-  catch(e){showAl('dumpAl','er','Stockage plein — réduis les saisons ou efface le dump');}
+  try{
+    localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(d));
+  }catch(e){
+    // Stockage plein — on garde uniquement les entrées avec score
+    try{
+      var slim={};
+      Object.values(d).forEach(function(e){if(e.sh!==null&&e.sh!==undefined)slim[e.id]=e;});
+      localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(slim));
+      showAl('dumpAl','in','Stockage quasi-plein — dump allégé (entrées sans score supprimées)');
+    }catch(e2){
+      showAl('dumpAl','er','Stockage plein — efface le dump ou la base avant de continuer');
+    }
+  }
 }
-
 function getStatsKey(){return cfg.statsApiKey||'';}
 
 async function statsCall(endpoint,params){
   var key=getStatsKey();
   if(!key)throw new Error('Clé TheStatsAPI manquante — configure-la dans Config');
   var url=STATS_BASE+endpoint;
-  if(params&&Object.keys(params).length){
-    url+='?'+Object.keys(params).map(function(k){
-      return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
-    }).join('&');
-  }
-  var resp=await fetch(url,{
-    headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}
-  });
+  if(params&&Object.keys(params).length)
+    url+='?'+Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  var resp=await fetch(url,{headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}});
   if(!resp.ok){
     if(resp.status===401||resp.status===403)throw new Error('Clé invalide ou expirée ('+resp.status+')');
     if(resp.status===429)throw new Error('RATE_LIMIT');
@@ -4236,355 +4239,235 @@ async function statsCall(endpoint,params){
   return resp.json();
 }
 
-// Throttle : 120 req/min → 1 req/500ms
-async function _throttle(nReq){
-  await new Promise(function(r){setTimeout(r,520);});
+async function safeCall(endpoint,params,nRef){
+  while(true){
+    try{
+      nRef[0]++;
+      document.getElementById('dumpReqCount').textContent='Requêtes : '+nRef[0];
+      await new Promise(function(r){setTimeout(r,520);}); // ~115 req/min safe
+      return await statsCall(endpoint,params);
+    }catch(e){
+      if(e.message==='RATE_LIMIT'){
+        document.getElementById('dumpMsg').textContent='Rate limit — attente 35s...';
+        await new Promise(function(r){setTimeout(r,35000);});
+      } else throw e;
+    }
+  }
 }
-async function _throttleRateLimit(){
-  await new Promise(function(r){setTimeout(r,35000);});
+
+// ── Index par date+équipes pour matching sans ID ──
+var _dumpIdx=null;
+function buildDumpIdx(dump){
+  _dumpIdx={};
+  Object.values(dump).forEach(function(e){
+    if(!e.date)return;
+    if(!_dumpIdx[e.date])_dumpIdx[e.date]=[];
+    _dumpIdx[e.date].push(e);
+  });
+}
+function findInDump(dump,home,away,date){
+  if(!_dumpIdx)buildDumpIdx(dump);
+  return ((_dumpIdx[date])||[]).find(function(e){
+    return teamMatch(home,e.h)&&teamMatch(away,e.a);
+  })||null;
 }
 
 function setDumpSaisons(n){
   _dumpSaisons=n;
-  document.querySelectorAll('#dumpSaisonChips .chip').forEach(function(c){
-    c.classList.toggle('on',parseInt(c.dataset.val)===n);
-  });
+  document.querySelectorAll('#dumpSaisonChips .chip').forEach(function(c){c.classList.toggle('on',parseInt(c.dataset.val)===n);});
 }
 function setDumpMode(m){
   _dumpMode=m;
-  document.querySelectorAll('#dumpEnrichChips .chip').forEach(function(c){
-    c.classList.toggle('on',c.dataset.mode===m);
-  });
+  document.querySelectorAll('#dumpModeChips .chip').forEach(function(c){c.classList.toggle('on',c.dataset.mode===m);});
 }
-
 function initDumpPanel(){
+  _dumpIdx=null;
+  // Sync état visuel des chips avec les valeurs courantes
+  document.querySelectorAll('#dumpSaisonChips .chip').forEach(function(c){c.classList.toggle('on',parseInt(c.dataset.val)===_dumpSaisons);});
+  document.querySelectorAll('#dumpModeChips .chip').forEach(function(c){c.classList.toggle('on',c.dataset.mode===_dumpMode);});
   var dump=getDumpDB();
-  var nb=Object.keys(dump).length;
-  if(nb>0){renderDumpStats();}
+  if(Object.keys(dump).length)renderDumpStats();
   else{var out=document.getElementById('dumpOut');if(out)out.style.display='none';}
 }
-function clearDumpDB(){localStorage.removeItem(STATS_DUMP_KEY);showAl('dumpAl','ok','Dump effacé');initDumpPanel();}
+function clearDumpDB(){localStorage.removeItem(STATS_DUMP_KEY);_dumpIdx=null;showAl('dumpAl','ok','Dump effacé');initDumpPanel();}
 function stopDump(){_dumpRunning=false;}
-
-// ── Extracteur de stats depuis la réponse /matches/{id}/stats ──
-function extractStats(data){
-  if(!data)return null;
-  var ov=data.overview||{};
-  function g(obj){return obj&&obj.all?{h:obj.all.home,a:obj.all.away,h1:obj.first_half?obj.first_half.home:null,a1:obj.first_half?obj.first_half.away:null}:null;}
-  var xgRaw=g(ov.expected_goals);
-  var npxg=data.np_expected_goals?g(data.np_expected_goals):null;
-  return{
-    possession:g(ov.ball_possession),
-    xg:xgRaw,
-    npxg:npxg,
-    bigChances:g(ov.big_chances),
-    shots:g(ov.total_shots),
-    shotsOnTarget:g(ov.shots_on_target),
-    saves:g(ov.goalkeeper_saves),
-    corners:g(ov.corner_kicks),
-    fouls:g(ov.fouls),
-    yellow:g(ov.yellow_cards),
-    red:g(ov.red_cards),
-    passes:g(ov.passes),
-    accuratePasses:g(ov.accurate_passes),
-    tackles:g(ov.tackles),
-    // Shots détaillés
-    shotsInsideBox:data.shots?g(data.shots.shots_inside_box):null,
-    shotsOutsideBox:data.shots?g(data.shots.shots_outside_box):null,
-    blockedShots:data.shots?g(data.shots.blocked_shots):null,
-    // Attaque
-    bigChancesMissed:data.attack?g(data.attack.big_chances_missed):null,
-    touchesPenArea:data.attack?g(data.attack.touches_in_penalty_area):null,
-    offsides:data.attack?g(data.attack.offsides):null,
-    // Passes
-    accurateCrosses:data.passes?g(data.passes.accurate_crosses):null,
-    accurateLongBalls:data.passes?g(data.passes.accurate_long_balls):null,
-    // Défense
-    interceptions:data.defending?g(data.defending.interceptions):null,
-    clearances:data.defending?g(data.defending.clearances):null,
-    // GK
-    goalsPrevented:data.goalkeeping?g(data.goalkeeping.goals_prevented):null,
-  };
-}
-
-// ── Extracteur de cotes depuis /matches/{id}/odds ──
-function extractOdds(data){
-  if(!data||!data.bookmakers||!data.bookmakers.length)return null;
-  var out={};
-  data.bookmakers.forEach(function(bk){
-    var bName=bk.bookmaker;
-    var m=bk.markets||{};
-    out[bName]={};
-    if(m.match_odds){out[bName].v1x2={home:m.match_odds.home,draw:m.match_odds.draw,away:m.match_odds.away};}
-    if(m.btts){out[bName].btts={yes:m.btts.yes,no:m.btts.no};}
-    if(m.total_goals){out[bName].totals=m.total_goals;}
-    if(m.match_corners){out[bName].corners=m.match_corners;}
-    if(m.asian_handicap){out[bName].ah=m.asian_handicap;}
-  });
-  return out;
-}
 
 async function startDump(){
   if(_dumpRunning)return;
-  var key=getStatsKey();
-  if(!key){showAl('dumpAl','er','Clé TheStatsAPI manquante — configure-la dans Config');return;}
-
-  _dumpRunning=true;
+  if(!getStatsKey()){showAl('dumpAl','er','Clé TheStatsAPI manquante — configure-la dans Config');return;}
+  _dumpRunning=true;_dumpIdx=null;
   hideAl('dumpAl');
   document.getElementById('btnDump').disabled=true;
   document.getElementById('btnDumpStop').style.display='block';
   document.getElementById('dumpProgress').style.display='block';
-  document.getElementById('dumpNMatches').textContent='0';
-  document.getElementById('dumpNStats').textContent='0';
-  document.getElementById('dumpNXg').textContent='0';
-  document.getElementById('dumpNOdds').textContent='0';
+  ['dumpNMatches','dumpNXg'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent='0';});
 
-  var nMatches=0,nStats=0,nXg=0,nOdds=0,nReq=0;
+  var nMatches=0,nXg=0,nRef=[0];
   var dumpDB=getDumpDB();
 
   function upd(msg,pct){
     document.getElementById('dumpMsg').textContent=msg;
-    document.getElementById('dumpPct').textContent=Math.round(pct)+'%';
-    document.getElementById('dumpFill').style.width=Math.round(pct)+'%';
-    document.getElementById('dumpReqCount').textContent='Requêtes : '+nReq;
-  }
-
-  async function safeCall(endpoint,params){
-    while(true){
-      try{
-        nReq++;
-        await _throttle(nReq);
-        var r=await statsCall(endpoint,params);
-        return r;
-      }catch(e){
-        if(e.message==='RATE_LIMIT'){upd('Rate limit — attente 35s...',-1);await _throttleRateLimit();}
-        else throw e;
-      }
+    if(pct>=0){
+      document.getElementById('dumpPct').textContent=Math.round(pct)+'%';
+      document.getElementById('dumpFill').style.width=Math.round(pct)+'%';
     }
   }
 
   try{
-
-  if(_dumpMode==='enrich'){
-    // ──────────────────────────────────────────────────────────
-    // MODE ENRICHISSEMENT : stats + xG + cotes sur matchs en base
-    // ──────────────────────────────────────────────────────────
-    var db=getDB();
-    var toEnrich=[];
-    Object.values(db).forEach(function(day){
-      day.forEach(function(m){
-        if(TERM.indexOf(m.status)>=0&&!dumpDB[m.id]){
-          toEnrich.push(m);
-        }
-      });
-    });
-
-    if(!toEnrich.length){
-      showAl('dumpAl','in','Tous les matchs terminés sont déjà enrichis.');
-      return finishDump(nMatches,nStats,nXg,nOdds,nReq);
-    }
-
-    var total=toEnrich.length,done=0;
-    upd('Enrichissement de '+total+' matchs...',2);
-
-    for(var i=0;i<toEnrich.length&&_dumpRunning;i++){
-      var m=toEnrich[i];
-      done++;
-      if(done%10===0)upd(m.home+' vs '+m.away,5+(done/total)*88);
-
-      var entry={id:m.id};
-
-      // Stats + xG
-      var statsResp=await safeCall('/football/matches/'+m.id+'/stats',{});
-      if(statsResp&&statsResp.data){
-        var s=extractStats(statsResp.data);
-        if(s){
-          entry.stats=s;
-          nStats++;
-          document.getElementById('dumpNStats').textContent=nStats;
-          if(s.xg&&(s.xg.h!==null)){
-            entry.xg={home:s.xg.h,away:s.xg.a,npxgHome:s.npxg?s.npxg.h:null,npxgAway:s.npxg?s.npxg.a:null};
-            nXg++;document.getElementById('dumpNXg').textContent=nXg;
-          }
-        }
-      }
-
-      // Cotes historiques
-      var oddsResp=await safeCall('/football/matches/'+m.id+'/odds',{});
-      if(oddsResp&&oddsResp.data){
-        var o=extractOdds(oddsResp.data);
-        if(o){entry.odds=o;nOdds++;document.getElementById('dumpNOdds').textContent=nOdds;}
-      }
-
-      dumpDB[m.id]=entry;
-      nMatches++;document.getElementById('dumpNMatches').textContent=nMatches;
-      if(done%25===0)setDumpDB(dumpDB);
-    }
-
-    // Injecter dans la base locale
-    upd('Injection en base...',95);
-    var injected=0;
-    Object.keys(db).forEach(function(date){
-      db[date].forEach(function(m){
-        var e=dumpDB[m.id];
-        if(e){
-          if(e.stats)m._stats=e.stats;
-          if(e.xg)m._xg=e.xg;
-          if(e.odds)m._statsApiOdds=e.odds;
-          injected++;
-        }
-      });
-    });
-    var db2=getDB();Object.keys(db).forEach(function(d){db2[d]=db[d];});setDB(db2);
-    showAl('dumpAl','ok','✅ '+injected+' matchs enrichis · '+nStats+' stats · '+nXg+' xG · '+nOdds+' cotes');
-
-  }else{
-    // ──────────────────────────────────────────────────────────
-    // MODE DUMP MASSIF : compétitions → saisons → matchs → stats
-    // ──────────────────────────────────────────────────────────
+    // ── ÉTAPE 1 : Compétitions ────────────────────────────────
     upd('Récupération des compétitions...',2);
-    var compsResp=await safeCall('/football/competitions',{per_page:100,type:'league'});
+    var compsResp=await safeCall('/football/competitions',{per_page:100,type:'league'},nRef);
     if(!compsResp||!compsResp.data||!compsResp.data.length){
       showAl('dumpAl','er','Impossible de récupérer les compétitions — vérifie ta clé');
-      return finishDump(nMatches,nStats,nXg,nOdds,nReq);
+      return finishDump(nMatches,nXg,nRef[0]);
     }
 
-    // Matcher avec les ligues en base
+    // Matcher avec ligues en base + top ligues
     var mainDB=getDB();
     var liguesBase=new Set();
     Object.values(mainDB).forEach(function(day){
       day.forEach(function(m){if(m.league)liguesBase.add(m.league.toLowerCase().trim());});
     });
-
     var TOP=['premier league','la liga','bundesliga','serie a','ligue 1','eredivisie','primeira liga','champions league','europa league'];
     var targetComps=compsResp.data.filter(function(c){
       var n=(c.name||'').toLowerCase();
       return liguesBase.has(n)||TOP.some(function(t){return n.indexOf(t)>=0;});
     });
     if(!targetComps.length)targetComps=compsResp.data.slice(0,5);
-    // Filtrer sur les compétitions qui ont xG/stats/odds si possible
-    var withXg=targetComps.filter(function(c){return c.xg_available&&c.has_team_stats;});
-    if(withXg.length)targetComps=withXg;
 
-    upd(targetComps.length+' compétitions ciblées — saisons...',5);
-
-    // Récupérer les saisons
+    // ── ÉTAPE 2 : Saisons ────────────────────────────────────
     var compSeasons=[];
     for(var ci=0;ci<targetComps.length&&_dumpRunning;ci++){
       var comp=targetComps[ci];
-      var sResp=await safeCall('/football/competitions/'+comp.id+'/seasons',{});
-      if(sResp&&sResp.data){
-        sResp.data.slice(0,_dumpSaisons).forEach(function(s){
-          compSeasons.push({comp:comp,season:s});
-        });
-      }
+      upd('Saisons : '+comp.name,4+(ci/targetComps.length)*4);
+      var sResp=await safeCall('/football/competitions/'+comp.id+'/seasons',{},nRef);
+      if(sResp&&sResp.data)
+        sResp.data.slice(0,_dumpSaisons).forEach(function(s){compSeasons.push({comp:comp,season:s});});
     }
 
-    var totalPairs=compSeasons.length,donePairs=0;
-    var allMatchIds=[];
-
-    // Collecter les matchs terminés
+    // ── ÉTAPE 3 : Matchs avec scores (1 req / page de 100) ───
+    var allIds=[];
     for(var pci=0;pci<compSeasons.length&&_dumpRunning;pci++){
-      var cs=compSeasons[pci];donePairs++;
-      upd(cs.comp.name+' · '+cs.season.name,8+(donePairs/totalPairs)*25);
-
+      var cs=compSeasons[pci];
+      upd(cs.comp.name+' · '+cs.season.name,8+(pci/compSeasons.length)*72);
       var page=1,hasMore=true;
       while(hasMore&&_dumpRunning){
         var fxResp=await safeCall('/football/matches',{
           competition_id:cs.comp.id,season_id:cs.season.id,
           status:'finished',per_page:100,page:page
-        });
+        },nRef);
         if(!fxResp||!fxResp.data||!fxResp.data.length){hasMore=false;break;}
         fxResp.data.forEach(function(m){
-          if(!m.id||dumpDB[m.id])return;
-          dumpDB[m.id]={
-            id:m.id,
-            homeTeam:m.home_team&&(m.home_team.name),
-            awayTeam:m.away_team&&(m.away_team.name),
-            date:m.utc_date?m.utc_date.split('T')[0]:null,
-            competition:cs.comp.name,season:cs.season.name,
-            homeScore:m.score&&m.score.home,
-            awayScore:m.score&&m.score.away,
-            hasXg:!!m.xg_available,
-            hasOdds:!!m.odds_available,
-          };
-          allMatchIds.push({id:m.id,hasXg:!!m.xg_available,hasOdds:!!m.odds_available});
-          nMatches++;
+          if(!m.id)return;
+          var date=m.utc_date?m.utc_date.split('T')[0]:null;
+          var hScore=m.score&&m.score.home;
+          var aScore=m.score&&m.score.away;
+          // Stocker uniquement l'essentiel : équipes + date + score
+          if(!dumpDB[m.id]){
+            dumpDB[m.id]={
+              id:m.id,
+              h:m.home_team&&m.home_team.name,
+              a:m.away_team&&m.away_team.name,
+              date:date,
+              comp:cs.comp.name,
+              sh:hScore,  // score home
+              sa:aScore,  // score away
+              xg:m.xg_available?null:undefined, // null = à récupérer, undefined = pas dispo
+            };
+            nMatches++;
+          }
+          if(m.xg_available&&dumpDB[m.id]&&dumpDB[m.id].xg===null)
+            allIds.push(m.id);
         });
         document.getElementById('dumpNMatches').textContent=nMatches;
         hasMore=fxResp.meta&&fxResp.meta.page<fxResp.meta.total_pages;
         page++;
-        if(nMatches%200===0)setDumpDB(dumpDB);
+        if(nMatches%500===0)setDumpDB(dumpDB);
       }
     }
 
     setDumpDB(dumpDB);
-    upd('Matchs collectés : '+nMatches+' · Enrichissement stats...',35);
+    _dumpIdx=null;
 
-    // Prioriser les matchs en base locale
-    var localIds=new Set();
-    Object.values(mainDB).forEach(function(day){day.forEach(function(m){localIds.add(m.id);});});
-    allMatchIds.sort(function(a,b){var aL=localIds.has(a.id)?0:1,bL=localIds.has(b.id)?0:1;return aL-bL;});
+    // ── ÉTAPE 4 : xG si mode 'scores+xg' ────────────────────
+    if(_dumpMode==='scores+xg'&&allIds.length&&_dumpRunning){
+      upd('xG : 0/'+allIds.length+' matchs...',82);
+      // Prioriser les matchs en base locale
+      buildDumpIdx(dumpDB);
+      var localFirst=[],rest=[];
+      Object.values(mainDB).forEach(function(day){
+        day.forEach(function(m){
+          var e=findInDump(dumpDB,m.home,m.away,m.date||'');
+          if(e&&e.xg===null)localFirst.push(e.id);
+        });
+      });
+      var localSet=new Set(localFirst);
+      allIds.forEach(function(id){if(!localSet.has(id))rest.push(id);});
+      var ordered=localFirst.concat(rest);
 
-    var totalEnrich=allMatchIds.length,doneEnrich=0;
-    for(var mi=0;mi<allMatchIds.length&&_dumpRunning;mi++){
-      var mid=allMatchIds[mi];
-      doneEnrich++;
-      if(doneEnrich%20===0){
-        upd('Stats '+doneEnrich+'/'+totalEnrich,35+(doneEnrich/totalEnrich)*55);
-        setDumpDB(dumpDB);
-      }
+      for(var xi=0;xi<ordered.length&&_dumpRunning;xi++){
+        var mid=ordered[xi];
+        if(!dumpDB[mid]||dumpDB[mid].xg!==null)continue;
+        if(xi%10===0)upd('xG '+xi+'/'+ordered.length,82+(xi/ordered.length)*14);
 
-      // Stats + xG
-      var sr=await safeCall('/football/matches/'+mid.id+'/stats',{});
-      if(sr&&sr.data){
-        var st=extractStats(sr.data);
-        if(st){
-          dumpDB[mid.id].stats=st;
-          nStats++;document.getElementById('dumpNStats').textContent=nStats;
-          if(st.xg&&st.xg.h!==null){
-            dumpDB[mid.id].xg={home:st.xg.h,away:st.xg.a,npxgHome:st.npxg?st.npxg.h:null,npxgAway:st.npxg?st.npxg.a:null};
-            nXg++;document.getElementById('dumpNXg').textContent=nXg;
-          }
+        var sr=await safeCall('/football/matches/'+mid+'/stats',{},nRef);
+        if(sr&&sr.data){
+          var ov=sr.data.overview||{};
+          var xgH=ov.expected_goals&&ov.expected_goals.all?ov.expected_goals.all.home:null;
+          var xgA=ov.expected_goals&&ov.expected_goals.all?ov.expected_goals.all.away:null;
+          var npH=sr.data.np_expected_goals&&sr.data.np_expected_goals.all?sr.data.np_expected_goals.all.home:null;
+          var npA=sr.data.np_expected_goals&&sr.data.np_expected_goals.all?sr.data.np_expected_goals.all.away:null;
+          dumpDB[mid].xg={h:xgH,a:xgA,nh:npH,na:npA};
+          if(xgH!==null){nXg++;document.getElementById('dumpNXg').textContent=nXg;}
+        } else {
+          dumpDB[mid].xg=undefined; // pas dispo
         }
-      }
-
-      // Cotes (seulement si disponibles)
-      if(mid.hasOdds){
-        var or=await safeCall('/football/matches/'+mid.id+'/odds',{});
-        if(or&&or.data){
-          var ods=extractOdds(or.data);
-          if(ods){dumpDB[mid.id].odds=ods;nOdds++;document.getElementById('dumpNOdds').textContent=nOdds;}
-        }
+        if(xi%50===0)setDumpDB(dumpDB);
       }
     }
 
-    // Injecter en base locale
-    upd('Injection en base locale...',93);
-    var injected=0;
-    Object.keys(mainDB).forEach(function(date){
-      mainDB[date].forEach(function(m){
-        var e=dumpDB[m.id];
-        if(e){
-          if(e.stats)m._stats=e.stats;
-          if(e.xg)m._xg=e.xg;
-          if(e.odds)m._statsApiOdds=e.odds;
-          injected++;
+    // ── ÉTAPE 5 : Injection en base locale (jour par jour) ───
+    upd('Injection en base...',97);
+    _dumpIdx=null;buildDumpIdx(dumpDB);
+    var injected=0,injectedXg=0;
+    var db2=getDB();
+    Object.keys(db2).forEach(function(date){
+      var modified=false;
+      db2[date].forEach(function(m){
+        var e=findInDump(dumpDB,m.home,m.away,date);
+        if(!e)return;
+        if(e.sh!==null&&e.sh!==undefined&&(m.h===null||m.h===undefined)){
+          m.h=e.sh;m.a=e.sa;
+          m.status=m.status||'FT';
+          injected++;modified=true;
+        }
+        if(e.xg&&e.xg.h!==null&&!m._xg){
+          m._xg={home:e.xg.h,away:e.xg.a,npxgHome:e.xg.nh,npxgAway:e.xg.na};
+          injectedXg++;modified=true;
         }
       });
+      // Écrire uniquement les jours modifiés
+      if(modified){
+        try{
+          var db3=getDB();db3[date]=db2[date];
+          localStorage.setItem(DB_KEY,JSON.stringify(db3));
+        }catch(ex){
+          showAl('dumpAl','er','Base pleine lors de l\'injection du '+date+' — arrêt');
+          return;
+        }
+      }
     });
-    var db3=getDB();Object.keys(mainDB).forEach(function(d){db3[d]=mainDB[d];});setDB(db3);
-    showAl('dumpAl','ok','✅ Dump terminé — '+nMatches+' matchs · '+nStats+' stats · '+nXg+' xG · '+nOdds+' cotes · '+injected+' injectés en base');
-  }
+    setDumpDB(dumpDB);
+    var msg='✅ '+nMatches+' matchs collectés';
+    if(injected)msg+=' · '+injected+' scores injectés en base';
+    if(injectedXg)msg+=' · '+injectedXg+' xG';
+    showAl('dumpAl','ok',msg);
 
-  }catch(e){
-    showAl('dumpAl','er','Erreur : '+e.message);
-  }
-  setDumpDB(dumpDB);
-  finishDump(nMatches,nStats,nXg,nOdds,nReq);
+  }catch(e){showAl('dumpAl','er','Erreur : '+e.message);}
+  finishDump(nMatches,nXg,nRef[0]);
 }
 
-function finishDump(nMatches,nStats,nXg,nOdds,nReq){
+function finishDump(nMatches,nXg,nReq){
   _dumpRunning=false;
   document.getElementById('btnDump').disabled=false;
   document.getElementById('btnDumpStop').style.display='none';
@@ -4596,17 +4479,15 @@ function renderDumpStats(){
   var dump=getDumpDB();
   var entries=Object.values(dump);
   if(!entries.length){var out=document.getElementById('dumpOut');if(out)out.style.display='none';return;}
-  var withStats=entries.filter(function(e){return e.stats;}).length;
-  var withXg=entries.filter(function(e){return e.xg;}).length;
-  var withOdds=entries.filter(function(e){return e.odds;}).length;
-  var comps=new Set(entries.map(function(e){return e.competition||'?';}));
+  var withScore=entries.filter(function(e){return e.sh!==null&&e.sh!==undefined;}).length;
+  var withXg=entries.filter(function(e){return e.xg&&e.xg.h!==null;}).length;
+  var comps=new Set(entries.map(function(e){return e.comp||'?';}));
   var html='<div class="card">';
-  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">DUMP SAUVEGARDÉ — '+Array.from(comps).slice(0,4).join(', ')+(comps.size>4?' +'+(comps.size-4):'')+'</div>';
-  html+='<div class="sg g4" style="margin-bottom:10px">';
+  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">DUMP — '+Array.from(comps).slice(0,4).join(', ')+(comps.size>4?' +'+(comps.size-4):'')+'</div>';
+  html+='<div class="sg g3" style="margin-bottom:10px">';
   html+='<div class="sb"><div class="sv" style="color:var(--g)">'+entries.length+'</div><div class="sl">Matchs</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+withStats+'</div><div class="sl">Stats</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--b)">'+withScore+'</div><div class="sl">Avec score</div></div>';
   html+='<div class="sb"><div class="sv" style="color:var(--p)">'+withXg+'</div><div class="sl">xG</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--y)">'+withOdds+'</div><div class="sl">Cotes hist.</div></div>';
   html+='</div>';
   html+='<button class="bsm" onclick="injectDumpIntoMatchCards()" style="width:100%;padding:8px;text-align:center;color:var(--teal,#20c997);border-color:var(--teal,#20c997)">↩ Injecter dans les matchs ouverts</button>';
   html+='<button class="bsm" onclick="if(confirm(\'Effacer le dump ?\'))clearDumpDB()" style="margin-top:5px;width:100%;padding:8px;text-align:center;color:var(--r);border-color:var(--r)">Effacer le dump</button>';
@@ -4617,24 +4498,21 @@ function renderDumpStats(){
 function injectDumpIntoMatchCards(){
   var dump=getDumpDB();
   if(!Object.keys(dump).length){showAl('dumpAl','er','Aucun dump disponible');return;}
+  _dumpIdx=null;buildDumpIdx(dump);
   var injected=0;
+  var date=document.getElementById('tdDate').value;
   allMatchsCache.forEach(function(m){
-    var entry=dump[m.id]||null;
-    if(!entry){
-      var d=m.date||document.getElementById('tdDate').value;
-      entry=Object.values(dump).find(function(e){
-        return e.date===d&&teamMatch(m.home,e.homeTeam)&&teamMatch(m.away,e.awayTeam);
-      })||null;
-    }
+    var mDate=m.date||date;
+    var entry=findInDump(dump,m.home,m.away,mDate);
     if(entry){
-      if(entry.stats)m._stats=entry.stats;
-      if(entry.xg)m._xg=entry.xg;
-      if(entry.odds)m._statsApiOdds=entry.odds;
+      if(entry.sh!==null&&entry.sh!==undefined&&m.h===null){m.h=entry.sh;m.a=entry.sa;}
+      if(entry.xg&&entry.xg.h!==null&&!m._xg)
+        m._xg={home:entry.xg.h,away:entry.xg.a,npxgHome:entry.xg.nh,npxgAway:entry.xg.na};
       injected++;
     }
   });
-  if(injected){renderMatchsList();showAl('dumpAl','ok',injected+' matchs enrichis avec stats/xG/cotes');}
-  else showAl('dumpAl','in','Aucun match correspondant trouvé dans le dump');
+  if(injected){renderMatchsList();showAl('dumpAl','ok',injected+' matchs enrichis');}
+  else showAl('dumpAl','in','Aucun match correspondant dans le dump pour cette date');
 }
 function loadScoreWeights(){try{var w=JSON.parse(localStorage.getItem(SCORE_WEIGHTS_KEY));if(w&&Object.keys(w).length>=4)SCORE_WEIGHTS=w;}catch(e){}}
 function saveScoreWeights(w){SCORE_WEIGHTS=w;localStorage.setItem(SCORE_WEIGHTS_KEY,JSON.stringify(w));}
