@@ -1356,8 +1356,8 @@ var anIdb=null;
 
 // ═══════════════════════════════════ UTILS ═══
 function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
-function today(){return new Date().toISOString().split('T')[0]}
-function nAgo(n){var d=new Date();d.setDate(d.getDate()-n);return d.toISOString().split('T')[0]}
+function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function nAgo(n){var d=new Date();d.setDate(d.getDate()-n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function autoTz(){return -Math.round(new Date().getTimezoneOffset()/60)}
 function getTz(){return(cfg.tz!==undefined&&!isNaN(cfg.tz))?cfg.tz:0}
 function getDB(){try{return JSON.parse(localStorage.getItem(DB_KEY)||'{}')}catch(e){return{}}}
