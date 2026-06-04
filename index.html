@@ -1339,7 +1339,7 @@ tr:hover td{background:var(--s2)}
 <script>
 // ═══════════════════════════════════ CONSTANTS & STATE ═══
 var DB_KEY='fsa_db_v5',CFG_KEY='fsa_cfg_v6',RES_KEY='fsa_res_v1',TRACK_KEY='fsa_track_v2',TK_KEY='fsa_tickets_v1',CALIB_KEY='fsa_calib_v1',AN_KEY='btts_h_v1';
-var PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?'];
+var PROXIES=['https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=','https://thingproxy.freeboard.io/fetch/'];
 var API='https://v3.football.api-sports.io';
 var TERM=['FT','AET','PEN','AWD','WO','CANC','ABD','SUSP','PST'],LIVE=['1H','HT','2H','ET','BT','P','INT','LIVE'];
 var seuil=2.5,seuilSt=2.5,seuilTd=2.5,seuilComp=2.5,seuilFiab=2.5,seuilTk=2.5;
@@ -1457,12 +1457,36 @@ async function apiCall(endpoint,params){
   if(!cfg.apiKey)return null;
   var url=new URL(API+endpoint);
   Object.keys(params).forEach(function(k){url.searchParams.set(k,params[k])});
+  var lastErr='';
   for(var pi=0;pi<PROXIES.length;pi++){
     try{
-      var r=await fetch(PROXIES[pi]+encodeURIComponent(url.toString()),{headers:{'x-apisports-key':cfg.apiKey,'x-rapidapi-key':cfg.apiKey}});
-      if(r.ok){var d=await r.json();if(d&&d.response!==undefined)return d}
-    }catch(e){}
+      var proxyUrl=PROXIES[pi]+encodeURIComponent(url.toString());
+      var r=await fetch(proxyUrl,{headers:{'x-apisports-key':cfg.apiKey,'x-rapidapi-key':cfg.apiKey}});
+      if(r.ok){
+        var d=await r.json();
+        if(d&&d.response!==undefined){
+          // Vérifier erreurs API-Football (quota, clé invalide, etc.)
+          if(d.errors&&(d.errors.requests||d.errors.token||d.errors.rateLimit)){
+            var errs=d.errors;
+            lastErr=errs.requests?'Quota journalier dépassé (100 req/jour)':errs.token?'Clé API invalide ou expirée':errs.rateLimit?'Rate limit atteint — attends 1 min':'Erreur API: '+JSON.stringify(errs);
+            console.warn('[apiCall] API error:',lastErr);
+            window._lastApiErr=lastErr;
+            return null;
+          }
+          window._lastApiErr='';
+          return d;
+        }
+        lastErr='Réponse proxy invalide (proxy '+pi+')';
+      } else {
+        lastErr='HTTP '+r.status+' (proxy '+pi+')';
+      }
+    }catch(e){
+      lastErr='Proxy '+pi+' inaccessible: '+e.message;
+      console.warn('[apiCall] proxy',pi,'failed:',e.message);
+    }
   }
+  window._lastApiErr=lastErr||'Tous les proxys CORS ont échoué';
+  console.error('[apiCall] All proxies failed. Last error:',lastErr);
   return null;
 }
 
@@ -3091,7 +3115,7 @@ async function loadMatchs(source){
   }else{
     if(!cfg.apiKey){document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Entre ta clé API dans Config');return}
     var data=await apiCall('/fixtures',{date:date});document.getElementById('tdLd').classList.remove('on');
-    if(!data){showAl('tdAl','er','Erreur API. Vérifie ta clé et ton quota.');return}
+    if(!data){showAl('tdAl','er',window._lastApiErr||'Erreur API. Vérifie ta clé et ton quota.');return}
     fx=data.response.map(function(f){return parseFix(f,tz)});
     if(fx.length>0){var db2=getDB();db2[date]=fx;setDB(db2);majDB()}
     showAl('tdAl','ok',fx.length+' matchs chargés et sauvegardés.');
