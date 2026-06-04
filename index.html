@@ -1783,7 +1783,8 @@ function getRealVal(t,mkt){if(mkt.rVal!==null)return t[mkt.rKey]===mkt.rVal?1:0;
 
 // ── mktAccuracy ──
 function mktAccuracy(entries,mkt){
-  var valid=entries.filter(function(t){return t[mkt.pKey]!==null&&t[mkt.pKey]!==undefined});
+  // Uniquement les entrées avec prédiction ET résultat réel connu
+  var valid=entries.filter(function(t){return t[mkt.pKey]!==null&&t[mkt.pKey]!==undefined&&t.rH!==null&&t.rA!==null&&t.rH!==undefined&&t.rA!==undefined});
   if(!valid.length)return{n:0,ok:0,acc:null,brier:null,realRate:null,predAvg:null};
   var ok=0,brier=0,realOk=0;
   valid.forEach(function(t){var prob=t[mkt.pKey]/100,real=getRealVal(t,mkt);brier+=Math.pow(prob-real,2);if(real)realOk++;if((prob>=0.5&&real)||(prob<0.5&&!real))ok++});
@@ -3080,7 +3081,13 @@ async function loadMatchs(source){
         showAl('tdAl','in','Données base locale ('+fx.length+' matchs)');
       }
     }
-    else{document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Aucun match en base pour le '+date+'. Lance la Collecte.');return}
+    else{
+      var allDates=Object.keys(getDB());
+      var msg=allDates.length?
+        'Aucun match en base pour le '+date+'. Lance la Collecte. ('+allDates.length+' autres dates en base)':
+        'Base de données vide — Lance la Collecte.';
+      document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er',msg);return;
+    }
   }else{
     if(!cfg.apiKey){document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Entre ta clé API dans Config');return}
     var data=await apiCall('/fixtures',{date:date});document.getElementById('tdLd').classList.remove('on');
@@ -4431,32 +4438,40 @@ async function startDump(){
     _dumpIdx=null;buildDumpIdx(dumpDB);
     var injected=0,injectedXg=0;
     var db2=getDB();
+    var modifiedDates=[];
     Object.keys(db2).forEach(function(date){
       var modified=false;
       db2[date].forEach(function(m){
         var e=findInDump(dumpDB,m.home,m.away,date);
         if(!e)return;
+        // Injecter score uniquement si le match n'en a pas et que le dump en a un
         if(e.sh!==null&&e.sh!==undefined&&(m.h===null||m.h===undefined)){
           m.h=e.sh;m.a=e.sa;
-          m.status=m.status||'FT';
+          // NE PAS toucher au statut — laisser l'API gérer ça
           injected++;modified=true;
         }
+        // xG
         if(e.xg&&e.xg.h!==null&&!m._xg){
           m._xg={home:e.xg.h,away:e.xg.a,npxgHome:e.xg.nh,npxgAway:e.xg.na};
           injectedXg++;modified=true;
         }
       });
-      // Écrire uniquement les jours modifiés
-      if(modified){
-        try{
-          var db3=getDB();db3[date]=db2[date];
-          localStorage.setItem(DB_KEY,JSON.stringify(db3));
-        }catch(ex){
-          showAl('dumpAl','er','Base pleine lors de l\'injection du '+date+' — arrêt');
-          return;
-        }
-      }
+      if(modified)modifiedDates.push(date);
     });
+
+    // Écrire toutes les dates modifiées en une seule passe
+    if(modifiedDates.length){
+      try{
+        localStorage.setItem(DB_KEY,JSON.stringify(db2));
+      }catch(ex){
+        // Fallback : écrire jour par jour
+        var db4=getDB();
+        modifiedDates.forEach(function(date){
+          try{db4[date]=db2[date];localStorage.setItem(DB_KEY,JSON.stringify(db4));}catch(e2){}
+        });
+      }
+    }
+
     setDumpDB(dumpDB);
     var msg='✅ '+nMatches+' matchs collectés';
     if(injected)msg+=' · '+injected+' scores injectés en base';
@@ -4601,7 +4616,7 @@ function exportValueBets(){
 
 
 // ═══════════════════════════════════ SÉLECTION DU JOUR ═══
-var selSeuil=70, selFiabMin=60, selMktActive='all', selStatus='all';
+var selSeuil=70, selFiabMin=60, selMktActive='all', selStatus='soon';
 
 function setSelSeuil(v){
   selSeuil=v;
@@ -4648,10 +4663,10 @@ function renderSelection(){
   var calib=window._calibCache||getCalib();
   var mkts=getSelMkts(seuilTd);
 
-  // Filtrer matchs selon statut
-  var matchs=allMatchsCache.slice();
-  if(selStatus==='soon') matchs=matchs.filter(function(m){return TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0});
-  else if(selStatus==='live') matchs=matchs.filter(function(m){return LIVE.indexOf(m.status)>=0});
+  // Toujours exclure les matchs terminés de la sélection
+  var matchs=allMatchsCache.filter(function(m){return TERM.indexOf(m.status)<0;});
+  if(selStatus==='soon') matchs=matchs.filter(function(m){return LIVE.indexOf(m.status)<0;});
+  else if(selStatus==='live') matchs=matchs.filter(function(m){return LIVE.indexOf(m.status)>=0;});
   matchs=matchs.filter(function(m){return m._pred;});
 
   if(!matchs.length){showAl('selAl','er','Aucun match avec prédiction disponible');return}
