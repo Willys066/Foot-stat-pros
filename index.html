@@ -1339,7 +1339,7 @@ tr:hover td{background:var(--s2)}
 <script>
 // ═══════════════════════════════════ CONSTANTS & STATE ═══
 var DB_KEY='fsa_db_v5',CFG_KEY='fsa_cfg_v6',RES_KEY='fsa_res_v1',TRACK_KEY='fsa_track_v2',TK_KEY='fsa_tickets_v1',CALIB_KEY='fsa_calib_v1',AN_KEY='btts_h_v1';
-var PROXIES=['https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=','https://thingproxy.freeboard.io/fetch/'];
+var PROXIES=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?'];
 var API='https://v3.football.api-sports.io';
 var TERM=['FT','AET','PEN','AWD','WO','CANC','ABD','SUSP','PST'],LIVE=['1H','HT','2H','ET','BT','P','INT','LIVE'];
 var seuil=2.5,seuilSt=2.5,seuilTd=2.5,seuilComp=2.5,seuilFiab=2.5,seuilTk=2.5;
@@ -1457,36 +1457,12 @@ async function apiCall(endpoint,params){
   if(!cfg.apiKey)return null;
   var url=new URL(API+endpoint);
   Object.keys(params).forEach(function(k){url.searchParams.set(k,params[k])});
-  var lastErr='';
   for(var pi=0;pi<PROXIES.length;pi++){
     try{
-      var proxyUrl=PROXIES[pi]+encodeURIComponent(url.toString());
-      var r=await fetch(proxyUrl,{headers:{'x-apisports-key':cfg.apiKey,'x-rapidapi-key':cfg.apiKey}});
-      if(r.ok){
-        var d=await r.json();
-        if(d&&d.response!==undefined){
-          // Vérifier erreurs API-Football (quota, clé invalide, etc.)
-          if(d.errors&&(d.errors.requests||d.errors.token||d.errors.rateLimit)){
-            var errs=d.errors;
-            lastErr=errs.requests?'Quota journalier dépassé (100 req/jour)':errs.token?'Clé API invalide ou expirée':errs.rateLimit?'Rate limit atteint — attends 1 min':'Erreur API: '+JSON.stringify(errs);
-            console.warn('[apiCall] API error:',lastErr);
-            window._lastApiErr=lastErr;
-            return null;
-          }
-          window._lastApiErr='';
-          return d;
-        }
-        lastErr='Réponse proxy invalide (proxy '+pi+')';
-      } else {
-        lastErr='HTTP '+r.status+' (proxy '+pi+')';
-      }
-    }catch(e){
-      lastErr='Proxy '+pi+' inaccessible: '+e.message;
-      console.warn('[apiCall] proxy',pi,'failed:',e.message);
-    }
+      var r=await fetch(PROXIES[pi]+encodeURIComponent(url.toString()),{headers:{'x-apisports-key':cfg.apiKey,'x-rapidapi-key':cfg.apiKey}});
+      if(r.ok){var d=await r.json();if(d&&d.response!==undefined)return d}
+    }catch(e){}
   }
-  window._lastApiErr=lastErr||'Tous les proxys CORS ont échoué';
-  console.error('[apiCall] All proxies failed. Last error:',lastErr);
   return null;
 }
 
@@ -1600,6 +1576,7 @@ function buildTrackEntry(m,pred,s,h,a){
     pHmsc:pred.hmsc!==null?Math.round(pred.hmsc*100):null,pAmsc:pred.amsc!==null?Math.round(pred.amsc*100):null,
     pDc1x:pred.dc1x!==null?Math.round(pred.dc1x*100):null,pDcx2:pred.dcx2!==null?Math.round(pred.dcx2*100):null,pDc12:pred.dc12!==null?Math.round(pred.dc12*100):null,
     pConf:pred.conf||0,pConv:pred.convergence||0,pNbSig:pred.nbSig||0,auto:true,
+    moyBH:pred.moyBH?parseFloat(pred.moyBH):null,moyBA:pred.moyBA?parseFloat(pred.moyBA):null,
     scenarioScores:m._scenarioPred||null,scenarioType:m._scenarioType||null};
 }
 
@@ -3115,7 +3092,7 @@ async function loadMatchs(source){
   }else{
     if(!cfg.apiKey){document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Entre ta clé API dans Config');return}
     var data=await apiCall('/fixtures',{date:date});document.getElementById('tdLd').classList.remove('on');
-    if(!data){showAl('tdAl','er',window._lastApiErr||'Erreur API. Vérifie ta clé et ton quota.');return}
+    if(!data){showAl('tdAl','er','Erreur API. Vérifie ta clé et ton quota.');return}
     fx=data.response.map(function(f){return parseFix(f,tz)});
     if(fx.length>0){var db2=getDB();db2[date]=fx;setDB(db2);majDB()}
     showAl('tdAl','ok',fx.length+' matchs chargés et sauvegardés.');
@@ -4835,65 +4812,113 @@ function renderSelection(){
 
 function calcScorePrecision(){
   var track=getTrack();
-  var withScenario=track.filter(function(t){
-    return t.scenarioScores&&t.scenarioScores.length&&t.rH!==null&&t.rA!==null;
+  var db=getDB();
+
+  // ── Dériver λ Poisson depuis les probabilités stockées ──
+  function deriveLambdas(t){
+    var lH=null,lA=null;
+    // Méthode A : CS → Poisson  P(0 buts dom)=pCsA/100=e^(-lH)
+    if(t.moyBH&&t.moyBA){
+      lH=parseFloat(t.moyBH);lA=parseFloat(t.moyBA);
+    } else {
+      if(t.pCsA>0&&t.pCsA<100) lH=-Math.log(t.pCsA/100);
+      else if(t.pHmsc>0&&t.pHmsc<100) lH=-Math.log(1-t.pHmsc/100);
+      if(t.pCsH>0&&t.pCsH<100) lA=-Math.log(t.pCsH/100);
+      else if(t.pAmsc>0&&t.pAmsc<100) lA=-Math.log(1-t.pAmsc/100);
+    }
+    if(!lH||!lA||!isFinite(lH)||!isFinite(lA)) return null;
+    return{lH:Math.max(0.3,Math.min(4.5,lH)),lA:Math.max(0.3,Math.min(4.5,lA))};
+  }
+  function scoresFromLambdas(lH,lA){
+    var pois=runPoisson(lH,lA);
+    var raw=getTopScores(pois.scoreMatrix,pois.tot,12);
+    return raw.map(function(sc){return{s:sc.h+'-'+sc.a,pct:Math.round(sc.p*100)};})
+              .sort(function(a,b){return b.pct-a.pct;}).slice(0,5);
+  }
+
+  // ── Catégorie 1 : entrées tracking (scenarioScores ou lambda dérivé) ──
+  var entries=[];
+  track.forEach(function(t){
+    if(t.rH===null||t.rH===undefined||t.rA===null||t.rA===undefined) return;
+    if(t.scenarioScores&&t.scenarioScores.length){
+      entries.push({rH:t.rH,rA:t.rA,scores:t.scenarioScores,type:t.scenarioType||'?',src:'scenario'});
+    } else {
+      var lam=deriveLambdas(t);
+      if(lam){
+        entries.push({rH:t.rH,rA:t.rA,scores:scoresFromLambdas(lam.lH,lam.lA),type:'dérivé',src:'derived'});
+      }
+    }
   });
-  if(withScenario.length<5){
-    showAl('fiabAl','er','Pas assez d\'entr\u00e9es avec pr\u00e9diction de score ('+withScenario.length+' — minimum 5). Lance d\'abord la Sync globale.');
+
+  // ── Catégorie 2 : matchs DB sans entrée tracking (λ = moyenne ligue) ──
+  var trackedIds=new Set(track.map(function(t){return t.id;}));
+  var leagueGoals={};
+  var allFin=[];
+  Object.keys(db).forEach(function(d){
+    (db[d]||[]).forEach(function(m){
+      if(TERM.indexOf(m.status)<0||m.h===null||m.a===null) return;
+      allFin.push(m);
+      if(!leagueGoals[m.league]) leagueGoals[m.league]={sumH:0,sumA:0,n:0};
+      leagueGoals[m.league].sumH+=m.h; leagueGoals[m.league].sumA+=m.a; leagueGoals[m.league].n++;
+    });
+  });
+  var gLH=allFin.length?allFin.reduce(function(a,m){return a+m.h;},0)/allFin.length:1.35;
+  var gLA=allFin.length?allFin.reduce(function(a,m){return a+m.a;},0)/allFin.length:1.05;
+
+  allFin.forEach(function(m){
+    if(trackedIds.has(m.id)) return;
+    var lg=leagueGoals[m.league];
+    var lH=lg&&lg.n>=8?(lg.sumH/lg.n):gLH;
+    var lA=lg&&lg.n>=8?(lg.sumA/lg.n):gLA;
+    entries.push({rH:m.h,rA:m.a,scores:scoresFromLambdas(lH,lA),type:'moy.ligue',src:'db'});
+  });
+
+  if(entries.length<5){
+    showAl('fiabAl','er','Pas assez de donn\u00e9es ('+entries.length+' matchs). Lance la collecte puis r\u00e9essaie.');
     return null;
   }
 
+  // ── Calcul des stats ──
   var stats={
-    total:withScenario.length,
+    total:entries.length,
+    bySrc:{scenario:0,derived:0,db:0},
     exactTop1:0,exactTop2:0,exactTop3:0,
-    // Erreur sur les buts
     errH:[],errA:[],errTotal:[],
-    // Par type de scénario
     byType:{},
-    // Biais directionnels (sur-prédit Dom/Ext ?)
-    homeOverPred:0,awayOverPred:0,
-    homeUnderPred:0,awayUnderPred:0,
+    homeOverPred:0,awayOverPred:0,homeUnderPred:0,awayUnderPred:0
   };
 
-  withScenario.forEach(function(t){
-    var realScore=t.rH+'-'+t.rA;
-    var scores=t.scenarioScores;
+  entries.forEach(function(e){
+    stats.bySrc[e.src]=(stats.bySrc[e.src]||0)+1;
+    var realScore=e.rH+'-'+e.rA;
+    var scores=e.scores;
     var top1=scores[0]?scores[0].s:null;
     var top2=scores[1]?scores[1].s:null;
     var top3=scores[2]?scores[2].s:null;
-
-    if(top1===realScore)stats.exactTop1++;
-    if(top1===realScore||top2===realScore)stats.exactTop2++;
-    if(top1===realScore||top2===realScore||top3===realScore)stats.exactTop3++;
-
-    // Erreur buts
+    if(top1===realScore) stats.exactTop1++;
+    if(top1===realScore||top2===realScore) stats.exactTop2++;
+    if(top1===realScore||top2===realScore||top3===realScore) stats.exactTop3++;
     if(top1){
       var p=top1.split('-');
       var pH=parseInt(p[0]),pA=parseInt(p[1]);
-      stats.errH.push(pH-t.rH);
-      stats.errA.push(pA-t.rA);
-      stats.errTotal.push(Math.abs(pH-t.rH)+Math.abs(pA-t.rA));
-      if(pH>t.rH)stats.homeOverPred++;else if(pH<t.rH)stats.homeUnderPred++;
-      if(pA>t.rA)stats.awayOverPred++;else if(pA<t.rA)stats.awayUnderPred++;
+      stats.errH.push(pH-e.rH); stats.errA.push(pA-e.rA);
+      stats.errTotal.push(Math.abs(pH-e.rH)+Math.abs(pA-e.rA));
+      if(pH>e.rH) stats.homeOverPred++; else if(pH<e.rH) stats.homeUnderPred++;
+      if(pA>e.rA) stats.awayOverPred++; else if(pA<e.rA) stats.awayUnderPred++;
     }
-
-    // Par type scénario
-    var type=t.scenarioType||'INCONNU';
-    if(!stats.byType[type])stats.byType[type]={total:0,exact1:0,exact2:0};
+    var type=e.type||'?';
+    if(!stats.byType[type]) stats.byType[type]={total:0,exact1:0,exact2:0};
     stats.byType[type].total++;
-    if(top1===realScore)stats.byType[type].exact1++;
-    if(top1===realScore||top2===realScore)stats.byType[type].exact2++;
+    if(top1===realScore) stats.byType[type].exact1++;
+    if(top1===realScore||top2===realScore) stats.byType[type].exact2++;
   });
 
-  // Calcul moyennes
   function avg(arr){return arr.length?Math.round(arr.reduce(function(a,b){return a+b},0)/arr.length*10)/10:0;}
   stats.avgErrH=avg(stats.errH);
   stats.avgErrA=avg(stats.errA);
   stats.avgErrTotal=avg(stats.errTotal);
-
   return stats;
 }
-
 function renderScorePrecision(stats){
   if(!stats)return;
   var html='<div class="card" style="margin-bottom:8px">';
@@ -4902,7 +4927,14 @@ function renderScorePrecision(stats){
   var p1=Math.round(stats.exactTop1/stats.total*100);
   var p2=Math.round(stats.exactTop2/stats.total*100);
   var p3=Math.round(stats.exactTop3/stats.total*100);
-  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">PR\u00c9CISION DES SCORES PR\u00c9DITS</div>';
+  html+='<div style="font-size:.62rem;letter-spacing:2px;font-family:var(--mono);color:var(--dm);margin-bottom:10px">PRÉCISION DES SCORES PRÉDITS</div>';
+  if(stats.bySrc){
+    var srcParts=[];
+    if(stats.bySrc.scenario) srcParts.push(stats.bySrc.scenario+' scénarios');
+    if(stats.bySrc.derived)  srcParts.push(stats.bySrc.derived+' dérivés');
+    if(stats.bySrc.db)       srcParts.push(stats.bySrc.db+' base');
+    if(srcParts.length) html+='<div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px">Sources : '+srcParts.join(' · ')+'</div>';
+  }
   html+='<div class="sg g3" style="margin-bottom:12px">';
   html+='<div class="sb"><div class="sv" style="color:'+(p1>=15?'var(--g)':p1>=10?'var(--y)':'var(--r)')+'">'+p1+'%</div><div class="sl">Score exact #1</div></div>';
   html+='<div class="sb"><div class="sv" style="color:'+(p2>=25?'var(--g)':p2>=15?'var(--y)':'var(--r)')+'">'+p2+'%</div><div class="sl">Top 2</div></div>';
