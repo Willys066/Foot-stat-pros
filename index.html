@@ -3156,11 +3156,13 @@ function renderMatchsList(){
     return;
   }
 
-  // Grouper par ligue
+  // Grouper par (heure + ligue) — une même ligue peut apparaître plusieurs fois
   var groups={};
   fx.forEach(function(m){
-    var k=(m.country?m.country+' · ':'')+( m.league||'?');
-    if(!groups[k])groups[k]={matchs:[],hasLive:false,hasSoon:false};
+    var h=m.heure?m.heure.substring(0,5):'99:99';
+    var lig=(m.country?m.country+' · ':'')+( m.league||'?');
+    var k=h+'|||'+lig;
+    if(!groups[k])groups[k]={matchs:[],label:lig,heure:h,hasLive:false,hasSoon:false};
     groups[k].matchs.push(m);
     if(LIVE.indexOf(m.status)>=0)groups[k].hasLive=true;
     if(TERM.indexOf(m.status)<0&&LIVE.indexOf(m.status)<0)groups[k].hasSoon=true;
@@ -3169,7 +3171,13 @@ function renderMatchsList(){
   window._matchRefs=[];
   var results=getRes();
 
-  Object.keys(groups).sort().forEach(function(gk){
+  // Tri : par heure d'abord, puis par nom de ligue
+  Object.keys(groups).sort(function(a,b){
+    var ha=groups[a].heure, hb=groups[b].heure;
+    if(ha!==hb)return ha.localeCompare(hb);
+    return groups[a].label.localeCompare(groups[b].label);
+  }).forEach(function(gk){
+    var gk_display=groups[gk].label; // afficher seulement le nom de ligue
     var g=groups[gk];
     var noPredData=g.matchs.every(function(m){return!m._pred;});var defaultOpen=g.hasLive||g.hasSoon||noPredData||Object.keys(groups).length<=4;
 
@@ -3179,7 +3187,7 @@ function renderMatchsList(){
     var liveCnt=g.matchs.filter(function(m){return LIVE.indexOf(m.status)>=0}).length;
     var headerDiv=document.createElement('div');
     headerDiv.className='lg-header'+(defaultOpen?' open':'');
-    headerDiv.innerHTML='<span class="lg-name">'+gk+'</span><span class="lg-meta">'+g.matchs.length+(liveCnt?' · <span style="color:var(--r)">'+liveCnt+' live</span>':'')+'</span>';
+    headerDiv.innerHTML='<span class="lg-name">'+gk_display+'</span><span class="lg-meta">'+g.matchs.length+(liveCnt?' · <span style="color:var(--r)">'+liveCnt+' live</span>':'')+'</span>';
     headerDiv.onclick=function(){this.classList.toggle('open');bodyDiv.classList.toggle('open');};
 
     var bodyDiv=document.createElement('div');
