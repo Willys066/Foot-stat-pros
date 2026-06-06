@@ -1583,21 +1583,41 @@ function computeAndSaveCalib(entries,s){
 
 // ── buildTrackEntry ──
 function buildTrackEntry(m,pred,s,h,a){
-  var tot=h+a;
-  return{id:m.id,date:today(),home:m.home,away:m.away,league:m.league||'?',country:m.country||'?',seuil:s,
-    rH:h,rA:a,rTotal:tot,rV1x2:h>a?'V1':h<a?'V2':'X',rBtts:h>0&&a>0,
-    rPlus:tot>s,rUnder:tot<=s,rCsH:a===0,rCsA:h===0,rHmsc:h>0,rAmsc:a>0,
-    rDc1x:h>=a,rDcx2:a>=h,rDc12:h!==a,
-    pPlus:pred.plus!==null?Math.round(pred.plus*100):null,pUnder:pred.under!==null?Math.round(pred.under*100):null,
-    pV1:pred.v1!==null?Math.round(pred.v1*100):null,pX:pred.x!==null?Math.round(pred.x*100):null,pV2:pred.v2!==null?Math.round(pred.v2*100):null,
-    pBtts:pred.btts!==null?Math.round(pred.btts*100):null,pBttsNon:pred.bttsNon!==null?Math.round(pred.bttsNon*100):null,
-    pCsH:pred.csH!==null?Math.round(pred.csH*100):null,pCsA:pred.csA!==null?Math.round(pred.csA*100):null,
-    pHmsc:pred.hmsc!==null?Math.round(pred.hmsc*100):null,pAmsc:pred.amsc!==null?Math.round(pred.amsc*100):null,
-    pDc1x:pred.dc1x!==null?Math.round(pred.dc1x*100):null,pDcx2:pred.dcx2!==null?Math.round(pred.dcx2*100):null,pDc12:pred.dc12!==null?Math.round(pred.dc12*100):null,
-    pConf:pred.conf||0,pConv:pred.convergence||0,pNbSig:pred.nbSig||0,auto:true,
-    moyBH:pred.moyBH?parseFloat(pred.moyBH):null,moyBA:pred.moyBA?parseFloat(pred.moyBA):null,
-    scenarioScores:m._scenarioPred||null,scenarioType:m._scenarioType||null};
+  // Champs minimaux pour économiser localStorage (limite ~5MB mobile)
+  // Les booléens résultat sont calculés à la volée depuis rH/rA/seuil
+  return{id:m.id,dt:m.date||today(),ho:m.home,aw:m.away,lg:m.league||'?',s:s,
+    rH:h,rA:a,
+    pP:pred.plus!==null?Math.round(pred.plus*100):null,
+    pU:pred.under!==null?Math.round(pred.under*100):null,
+    pV1:pred.v1!==null?Math.round(pred.v1*100):null,
+    pX:pred.x!==null?Math.round(pred.x*100):null,
+    pV2:pred.v2!==null?Math.round(pred.v2*100):null,
+    pB:pred.btts!==null?Math.round(pred.btts*100):null,
+    pBN:pred.bttsNon!==null?Math.round(pred.bttsNon*100):null,
+    pCH:pred.csH!==null?Math.round(pred.csH*100):null,
+    pCA:pred.csA!==null?Math.round(pred.csA*100):null,
+    pH:pred.hmsc!==null?Math.round(pred.hmsc*100):null,
+    pA:pred.amsc!==null?Math.round(pred.amsc*100):null,
+    p1x:pred.dc1x!==null?Math.round(pred.dc1x*100):null,
+    px2:pred.dcx2!==null?Math.round(pred.dcx2*100):null,
+    p12:pred.dc12!==null?Math.round(pred.dc12*100):null,
+    cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0};
 }
+// Accesseurs de compatibilité pour le code existant qui lit les anciens noms de champs
+function tkCompat(t){
+  if(t.home!==undefined)return t; // déjà ancien format
+  var tot=t.rH+t.rA,s=t.s;
+  return{id:t.id,date:t.dt,home:t.ho,away:t.aw,league:t.lg,country:'?',seuil:s,
+    rH:t.rH,rA:t.rA,rTotal:tot,rV1x2:t.rH>t.rA?'V1':t.rH<t.rA?'V2':'X',rBtts:t.rH>0&&t.rA>0,
+    rPlus:tot>s,rUnder:tot<=s,rCsH:t.rA===0,rCsA:t.rH===0,rHmsc:t.rH>0,rAmsc:t.rA>0,
+    rDc1x:t.rH>=t.rA,rDcx2:t.rA>=t.rH,rDc12:t.rH!==t.rA,
+    pPlus:t.pP,pUnder:t.pU,pV1:t.pV1,pX:t.pX,pV2:t.pV2,
+    pBtts:t.pB,pBttsNon:t.pBN,pCsH:t.pCH,pCsA:t.pCA,
+    pHmsc:t.pH,pAmsc:t.pA,pDc1x:t.p1x,pDcx2:t.px2,pDc12:t.p12,
+    pConf:t.cf,pConv:t.cv,pNbSig:t.ns,auto:true,
+    moyBH:null,moyBA:null,scenarioScores:null,scenarioType:null};
+}
+function getTrackCompat(){return getTrack().map(tkCompat);}
 
 // ── setFiabView ──
 function setFiabView(v){
@@ -2065,9 +2085,9 @@ async function lancer(force){
         ms=allFx.map(function(f){return parseFix(f,tz)});
         addLog(date+' - '+ms.length+' matchs','var(--g)');
       }else{
-        ms=allFx.filter(function(f){var st=f.fixture&&f.fixture.status?f.fixture.status.short:'';return TERM.indexOf(st)>=0||LIVE.indexOf(st)>=0;}).map(function(f){return parseFix(f,tz)});
-        var nIgn=allFx.length-ms.length;
-        addLog(date+' - '+ms.length+' terminés/live'+(nIgn?' ('+nIgn+' NS ignorés)':''),'var(--g)');
+        ms=allFx.map(function(f){return parseFix(f,tz)});
+        var nNS=ms.filter(function(x){return TERM.indexOf(x.status)<0&&LIVE.indexOf(x.status)<0}).length;
+        addLog(date+' - '+ms.length+' matchs'+(nNS?' (⚠ '+nNS+' NS)':''),'var(--g)');
       }
       if(ms.length>0){db[date]=ms;setDB(db)}
       j++;m+=ms.length;
@@ -4883,7 +4903,7 @@ function renderSelection(){
 // ═══════════════════════════════════ ANALYSE PRÉCISION SCORES ═══
 
 function calcScorePrecision(){
-  var track=getTrack(), db=getDB();
+  var track=getTrackCompat(), db=getDB();
   function deriveLambdas(t){
     var lH=null,lA=null;
     if(t.moyBH&&t.moyBA){lH=parseFloat(t.moyBH);lA=parseFloat(t.moyBA);}
@@ -5043,7 +5063,7 @@ function renderScorePrecision(stats){
 }
 
 function autoAdjustScoreWeights(){
-  var track=getTrack();
+  var track=getTrackCompat();
   var withScenario=track.filter(function(t){
     return t.scenarioScores&&t.scenarioScores.length&&t.rH!==null&&t.rA!==null;
   });
@@ -5198,7 +5218,7 @@ function getRealForMkt(k,t,s){
 }
 
 function calcRecalageJustesse(){
-  var track=getTrack();
+  var track=getTrackCompat();
   if(!track.length){showAl('alRecalage','er','Aucun tracking — Lance la synchronisation globale d\'abord.');return}
   loadRecalageWeights();
   var cache=buildCache();
@@ -5268,7 +5288,7 @@ function renderRecalageJustesse(results,processed,withRecal){
 }
 
 function recalibrerPoidsRecalage(){
-  var track=getTrack();
+  var track=getTrackCompat();
   if(track.length<20){showAl('alRecalage','er','Minimum 20 entr\u00e9es pour recalibrer.');return}
   var configs=[{lig:0.60,hour:0.25,global:0.15},{lig:0.50,hour:0.35,global:0.15},
                {lig:0.40,hour:0.40,global:0.20},{lig:0.70,hour:0.20,global:0.10},{lig:0.35,hour:0.50,global:0.15}];
@@ -5407,7 +5427,7 @@ function calc00(){
   var topH2H=Object.keys(h2hMap).filter(function(k){return h2hMap[k].total>=2&&h2hMap[k].n00>0}).map(function(k){return{name:k,total:h2hMap[k].total,n00:h2hMap[k].n00,rate:h2hMap[k].n00/h2hMap[k].total}}).sort(function(a,b){return b.n00-a.n00||b.rate-a.rate}).slice(0,8);
 
   // ─── Corrélations avec marchés (sur les matchs trackés) ───
-  var track=getTrack();
+  var track=getTrackCompat();
   var mktCorr={};
   var MKTS=['plus','under','btts','bttsNon','v1','x','v2','csH','csA'];
   var MLBLS={plus:'Over +seuil',under:'Under -seuil',btts:'BTTS Oui',bttsNon:'BTTS Non',v1:'Victoire Dom',x:'Match Nul',v2:'Victoire Ext',csH:'CS Dom',csA:'CS Ext'};
@@ -5822,13 +5842,13 @@ function finishSync(added,skipped,total,status){
   document.getElementById('syncFill').style.width='100%';
   document.getElementById('syncFill').style.background=added>0?'var(--g)':'var(--y)';
   try{
-    var track=getTrack();
+    var track=getTrackCompat();
     if(track.length){hideAl('fiabAl');computeAndSaveCalib(track,seuilFiab);renderFiabOut();}
   }catch(e){showAl('fiabAl','in','Sync terminée — '+added+' entrées ajoutées');}
 }
 
 function calcFiabilite(){
-  var track=getTrack();
+  var track=getTrackCompat();
   if(!track.length){showAl('fiabAl','er','Aucune donnée — Lance d\'abord la Synchronisation globale ou charge des matchs terminés');return}
   hideAl('fiabAl');
   try{computeAndSaveCalib(track,seuilFiab);renderFiabOut();}
@@ -5837,7 +5857,7 @@ function calcFiabilite(){
 function renderFiabOut(){
   try{
   ensureScoresTab();
-  var entries=getTrack(),s=seuilFiab;if(!entries.length)return;
+  var entries=getTrackCompat(),s=seuilFiab;if(!entries.length)return;
   var newCalib=getCalib(),calibApplied=Object.keys(newCalib).length>0;
   var gc=buildFiabGlobalCache(entries,s);
   window._calibData=gc.calibData;window._calibFact=newCalib;window._convData=gc.convData;
@@ -5987,7 +6007,7 @@ function renderFiabOut(){
         DAYS00.forEach(function(d){var e=dayMap00[d]||{total:0,n00:0};if(!e.total){html+='<div style="background:var(--s1);border-radius:6px;padding:6px 0;text-align:center;color:var(--dm)"><div style="font-weight:700;font-size:.7rem">'+d+'</div>—</div>';return;}var p=Math.round(e.n00/e.total*100);var col=p>=15?'#b06bff':(p>=8?'var(--y)':'var(--dm)');html+='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:6px;padding:6px 4px;text-align:center"><div style="font-weight:700;font-size:.7rem;color:var(--tx)">'+d+'</div><div style="font-size:.8rem;font-weight:900;color:'+col+'">'+p+'%</div><div style="font-size:.55rem;color:var(--dm)">'+e.n00+'/'+e.total+'</div></div>';});
         html+='</div>';
       }
-      var track00=getTrack();
+      var track00=getTrackCompat();
       if(track00.length>=5){
         var saved00w=window._00stats;window._00stats=all00;
         var buckets00=[{lbl:'0-9%',min:0,max:9,total:0,ok:0},{lbl:'10-19%',min:10,max:19,total:0,ok:0},{lbl:'20-29%',min:20,max:29,total:0,ok:0},{lbl:'30-39%',min:30,max:39,total:0,ok:0},{lbl:'40-49%',min:40,max:49,total:0,ok:0},{lbl:'50%+',min:50,max:100,total:0,ok:0}];
