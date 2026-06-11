@@ -413,9 +413,53 @@ tr:hover td{background:var(--s2)}
 .multi-input:focus{border-color:var(--g)}
 .multi-remove{background:transparent;border:none;cursor:pointer;color:var(--dm);font-size:.9rem;transition:color .2s;padding:4px}
 .multi-remove:hover{color:var(--r)}
+
+/* ── TRIAL SYSTEM ── */
+#accessScreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#accessScreen h2{font-size:1.8rem;font-weight:900;letter-spacing:4px;color:var(--g);margin-bottom:4px;text-transform:uppercase}
+#accessScreen p{font-size:.65rem;color:var(--dm);font-family:var(--mono);letter-spacing:2px;margin-bottom:24px;text-align:center}
+.access-inp{width:100%;max-width:320px;background:var(--s1);border:2px solid var(--bd);border-radius:10px;padding:14px 16px;color:var(--tx);font-size:1rem;text-align:center;font-family:var(--mono);letter-spacing:4px;outline:none;margin-bottom:12px;text-transform:uppercase}
+.access-inp:focus{border-color:var(--g)}
+.access-btn{width:100%;max-width:320px;padding:13px;background:var(--g);color:#000;font-weight:900;font-size:.9rem;letter-spacing:3px;border:none;border-radius:9px;cursor:pointer;font-family:var(--font);text-transform:uppercase}
+.access-err{color:var(--r);font-size:.7rem;font-family:var(--mono);margin-top:8px;min-height:18px;text-align:center}
+.quota-bar{position:fixed;bottom:0;left:0;right:0;background:var(--s1);border-top:1px solid var(--bd);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;z-index:100;max-width:560px;margin:0 auto}
+.quota-txt{font-size:.62rem;font-family:var(--mono);color:var(--dm)}
+.quota-dots{display:flex;gap:5px}
+.quota-dot{width:10px;height:10px;border-radius:50%;background:var(--bd2)}
+.quota-dot.used{background:var(--g)}
+.quota-dot.last{background:var(--y)}
+.lock-overlay{position:relative;overflow:hidden;border-radius:10px}
+.lock-overlay::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(6,10,16,0) 0%,rgba(6,10,16,.92) 55%,rgba(6,10,16,1) 100%);z-index:2;pointer-events:none}
+.lock-badge{position:absolute;bottom:0;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px 12px 14px;pointer-events:none}
+.lock-icon{font-size:2rem;margin-bottom:6px}
+.lock-label{font-size:.7rem;font-family:var(--mono);color:var(--tx);letter-spacing:2px;text-transform:uppercase;text-align:center;opacity:.8}
+.lock-sub{font-size:.58rem;font-family:var(--mono);color:var(--dm);margin-top:3px;text-align:center}
+
 </style>
 </head>
 <body>
+
+<!-- ACCESS SCREEN -->
+<div id="accessScreen">
+  <div style="font-size:2.5rem;margin-bottom:12px">⚽</div>
+  <h2>FootStats Pro</h2>
+  <p>Version Essai — Entre ton code d'accès</p>
+  <input class="access-inp" id="accessInp" type="text" placeholder="FSA-XXX-XXXXXXXX" maxlength="20" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')checkCode()"/>
+  <button class="access-btn" onclick="checkCode()">Accéder →</button>
+  <div class="access-err" id="accessErr"></div>
+  <div style="margin-top:28px;font-size:.58rem;font-family:var(--mono);color:var(--dm);text-align:center;line-height:1.8">3 prédictions / jour · Expire après 7 jours<br>Contacte-nous pour la version complète</div>
+</div>
+<!-- QUOTA BAR -->
+<div id="quotaBar" style="display:none" class="quota-bar">
+  <div class="quota-txt">PRÉDICTIONS AUJOURD'HUI</div>
+  <div class="quota-dots">
+    <div class="quota-dot" id="qd1"></div>
+    <div class="quota-dot" id="qd2"></div>
+    <div class="quota-dot" id="qd3"></div>
+  </div>
+  <div class="quota-txt" id="quotaTxt">0 / 3</div>
+</div>
+
 <div class="app">
 <div class="hdr">
   <h1>FOOT<span>STATS</span> PRO</h1>
@@ -447,6 +491,8 @@ tr:hover td{background:var(--s2)}
   <div class="card">
     <span class="clbl">Clé TheStatsAPI (Dump massif — essai 7j)</span>
     <div style="font-size:.62rem;color:var(--dm);margin-top:2px;margin-bottom:6px;font-family:var(--mono)">Matchs + stats + xG + cotes historiques · 100k req/mois · <a href="https://www.thestatsapi.com/auth?mode=signup" target="_blank" style="color:var(--b)">Démarrer l'essai gratuit</a></div>
+    <button class="bsm" onclick="testStatsKey()" style="font-size:.65rem;margin-bottom:4px;color:var(--y);border-color:var(--y)">🔍 Tester la clé TheStatsAPI</button>
+    <div id="statsKeyTestResult" style="font-size:.6rem;font-family:var(--mono);color:var(--dm);min-height:16px"></div>
     <div style="display:flex;gap:7px"><input class="inp" id="cfgStatsKey" type="password" placeholder="Bearer token TheStatsAPI..."/><button class="bsm" onclick="togglePwd('cfgStatsKey')">voir</button></div>
   </div>
   <div class="card">
@@ -967,6 +1013,8 @@ tr:hover td{background:var(--s2)}
 
 <!-- ═══════════════════════════════════════════════════════ TICKETS ══ -->
 <div class="panel" id="p5">
+<div class="lock-overlay" id="lockTickets">
+<div style="filter:blur(2px);pointer-events:none;max-height:340px;overflow:hidden">
   <div class="card">
     <span class="clbl">Générateur de tickets combinés</span>
     <div class="r2" style="margin-bottom:10px">
@@ -1010,7 +1058,8 @@ tr:hover td{background:var(--s2)}
     <button class="btn bg" id="btnTk" onclick="genTickets()">Générer les tickets</button>
   </div>
   <div class="al" id="tkAl"></div>
-  <div class="ld" id="tkLd"><div class="sp"></div><p>Analyse des matchs...</p></div>
+  </div><!-- end blur --><div class="lock-badge"><div class="lock-icon">🔒</div><div class="lock-label">Tickets — Version Complète</div><div class="lock-sub">Génération automatique de combinés optimisés</div></div></div><!-- end lock-overlay -->
+<div class="ld" id="tkLd"><div class="sp"></div><p>Analyse des matchs...</p></div>
   <div id="tkCotesSection" style="display:none">
     <div class="card">
       <span class="clbl">Cotes manuelles (optionnel)</span>
@@ -1023,88 +1072,23 @@ tr:hover td{background:var(--s2)}
 
 <!-- ═══════════════════════════════════════════════════════ ODDS ══ -->
 <div class="panel" id="p7">
-  <div class="info-api" style="margin-bottom:10px"><strong>The Odds API :</strong> Inscris-toi sur <a href="https://the-odds-api.com" target="_blank" style="color:var(--g)">the-odds-api.com</a> · Plan gratuit : 500 req/mois · Clé à saisir dans Config</div>
-  <div class="card">
-    <span class="clbl">Collecte globale des cotes</span>
-    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Détecte automatiquement toutes les compétitions foot actives via The Odds API et récupère les cotes en une seule opération.</p>
-    <div style="margin-bottom:10px">
-      <div class="lsm">Marchés à collecter</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap" id="oddsMktsChips">
-        <div class="chip on" data-mkt="h2h" onclick="toggleOddsMkt(this)">1X2</div>
-        <div class="chip on" data-mkt="doublechance" onclick="toggleOddsMkt(this)">Double Chance</div>
-        <div class="chip on" data-mkt="totals" onclick="toggleOddsMkt(this)">Over/Under</div>
-        <div class="chip on" data-mkt="btts" onclick="toggleOddsMkt(this)">BTTS</div>
-      </div>
+<div class="lock-overlay" id="lockCotes" style="min-height:320px">
+  <div style="filter:blur(2px);pointer-events:none;padding:14px">
+    <div class="card" style="margin-bottom:10px">
+      <span class="clbl">Collecte globale des cotes</span>
+      <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Détecte automatiquement toutes les compétitions foot actives via The Odds API et récupère les cotes en une seule opération.</p>
+      <div style="height:36px;background:var(--bd);border-radius:7px;opacity:.4"></div>
     </div>
-    <div style="margin-bottom:12px">
-      <div class="lsm">Format des cotes</div>
-      <div class="chips" id="oddsFormatChips">
-        <div class="chip on" onclick="setOddsFormat('decimal',this)">Décimal</div>
-        <div class="chip" onclick="setOddsFormat('american',this)">Américain</div>
-      </div>
-    </div>
-    <!-- Progress bar collecte globale -->
-    <div id="oddsGlobalProgress" style="display:none;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-        <span style="font-size:.62rem;color:var(--dm);font-family:var(--mono)" id="oddsProgressLbl">Chargement des compétitions...</span>
-        <span style="font-size:.62rem;color:var(--g);font-family:var(--mono)" id="oddsProgressPct">0%</span>
-      </div>
-      <div style="height:4px;background:var(--s2);border-radius:2px;overflow:hidden">
-        <div id="oddsProgressBar" style="height:100%;background:linear-gradient(90deg,var(--g),var(--teal));border-radius:2px;width:0%;transition:width .3s"></div>
-      </div>
-      <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:4px" id="oddsProgressSub"></div>
-    </div>
-    <button class="btn bb" id="btnCollectOdds" onclick="collectOddsGlobal()" style="margin-bottom:10px">🌍 Collecter toutes les cotes</button>
-
-    <!-- Filtres analyse -->
-    <div style="background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:11px;margin-bottom:10px">
-      <div style="font-size:.58rem;letter-spacing:2px;color:var(--dm);font-family:var(--mono);margin-bottom:8px">FILTRES ANALYSE</div>
-
-      <div style="margin-bottom:8px">
-        <div class="lsm">Seuil edge value bet</div>
-        <div class="chips" id="edgeChips">
-          <div class="chip" onclick="setEdgeSeuil(2)">2%</div>
-          <div class="chip on" onclick="setEdgeSeuil(5)">5%</div>
-          <div class="chip" onclick="setEdgeSeuil(8)">8%</div>
-          <div class="chip" onclick="setEdgeSeuil(10)">10%</div>
-        </div>
-      </div>
-
-      <div style="margin-bottom:8px">
-        <div class="lsm">Marchés à analyser</div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px" id="oddsMktFilter">
-          <div class="chip on" onclick="toggleOddsMktFilter(this,'all')" data-mkt="all">Tous</div>
-          <div class="chip" onclick="toggleOddsMktFilter(this,'1x2')" data-mkt="1x2">1X2</div>
-          <div class="chip" onclick="toggleOddsMktFilter(this,'ou')" data-mkt="ou">Over/Under</div>
-          <div class="chip" onclick="toggleOddsMktFilter(this,'btts')" data-mkt="btts">BTTS</div>
-          <div class="chip" onclick="toggleOddsMktFilter(this,'dc')" data-mkt="dc">DC</div>
-        </div>
-      </div>
-    </div>
-
-    <button class="bsm" onclick="calcOddsStats()" style="width:100%;padding:9px;text-align:center;color:var(--g);margin-bottom:6px">📊 Analyser les stats cotes</button>
-    <button class="bsm" onclick="exportValueBets()" style="width:100%;padding:9px;text-align:center;color:var(--b)">⬇️ Exporter value bets CSV</button>
-    <div id="oddsQuotaInfo" style="display:none;margin-top:8px;font-size:.62rem;color:var(--dm);font-family:var(--mono);padding:6px 9px;background:rgba(61,155,255,.05);border-radius:6px;border:1px solid rgba(61,155,255,.2)"></div>
-  </div>
-  <div class="al" id="oddsAl"></div>
-
-  <!-- Résumé collecte -->
-  <div id="oddsSummary" style="display:none;margin-bottom:8px">
-    <div class="sg g4">
-      <div class="sb"><div class="sv" id="oddsTotM" style="color:var(--b)">0</div><div class="sl">Matchs</div></div>
-      <div class="sb"><div class="sv" id="oddsTotL" style="color:var(--p)">0</div><div class="sl">Ligues</div></div>
-      <div class="sb"><div class="sv" id="oddsTotO" style="color:var(--g)">0</div><div class="sl">Cotes</div></div>
-      <div class="sb"><div class="sv" id="oddsLastUp" style="color:var(--y);font-size:.7rem">—</div><div class="sl">MAJ</div></div>
+    <div class="card">
+      <span class="clbl">Analyse croisée</span>
+      <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5">Croisement entre les cotes bookmakers et les prédictions FootStats pour détecter les value bets.</p>
+      <div style="height:80px;background:var(--bd);border-radius:7px;opacity:.3;margin-top:8px"></div>
     </div>
   </div>
-
-  <!-- Stats cotes output -->
-  <div id="oddsOut" style="display:none"></div>
-  <!-- Couplage prédictions / value bets -->
-  <div id="oddsAnalysisOut" style="display:none"></div>
+  <div class="lock-badge"><div class="lock-icon">🔒</div><div class="lock-label">Analyse des Cotes — Version Complète</div><div class="lock-sub">Croisement cotes bookmakers × prédictions FootStats</div></div>
+</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ SÉLECTION ══ -->
 <div class="panel" id="p8">
   <div class="card">
     <span class="clbl">&#x2B50; Sélection du jour</span>
@@ -1275,18 +1259,40 @@ tr:hover td{background:var(--s2)}
     </div>
     <button class="btn bb" onclick="calcFiabilite()" style="margin-bottom:7px">📊 Analyser la fiabilité</button>
     <button class="bsm" onclick="resetCalib()" style="width:100%;padding:9px;text-align:center;color:var(--y)">Réinitialiser la calibration</button>
+    <button class="bsm" onclick="resetDumpCountries()" style="width:100%;padding:9px;text-align:center;color:var(--r);margin-top:5px">↩ Réinitialiser les pays dump mal assignés</button>
+    <button class="btn bb" onclick="openLeagueEditor()" style="margin-top:10px;font-size:.78rem">🏆 Éditeur de ligues (pays manquants)</button>
   </div>
   <div class="al" id="fiabAl"></div>
   <div id="fiabOut" style="display:none"></div>
 
-  <!-- MODULE 0-0 -->
-  <div class="st" style="margin-top:16px">&#x1F512; Score 0-0 &#x2014; Analyse &amp; Corr&#xe9;lations</div>
+  <!-- MODULE SCORES EXACTS -->
+  <div class="st" style="margin-top:16px">&#x1F4CA; Scores Exacts &#x2014; Analyse &amp; Corr&#xe9;lations</div>
   <div class="card">
-    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:12px">Analyse tous les matchs termin&#xe9;s en base. Fr&#xe9;quence, corr&#xe9;lations ligue/heure/jour, &#xe9;quipes, H2H, et march&#xe9;s associ&#xe9;s.</p>
-    <button class="btn" style="background:linear-gradient(135deg,#1a0a2e,#2d0845);border:1px solid rgba(176,107,255,.4);color:var(--p);font-size:.8rem;margin-bottom:0" onclick="calc00()">&#x1F512; Calculer l'analyse 0-0</button>
+    <p style="font-size:.72rem;color:var(--dm);font-family:var(--mono);line-height:1.5;margin-bottom:10px">Analyse par score exact : fr&#xe9;quence, ligues, heures, jours, &#xe9;quipes, H2H, corr&#xe9;lations march&#xe9;s et tranches de pr&#xe9;diction.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button class="btn" style="background:linear-gradient(135deg,#1a0a2e,#2d0845);border:1px solid rgba(176,107,255,.4);color:var(--p);font-size:.72rem;padding:6px 10px" onclick="calcScore(0,0)">&#x1F512; 0-0</button>
+      <button class="btn" style="background:linear-gradient(135deg,#0a1a14,#0d2a1a);border:1px solid rgba(0,229,160,.3);color:var(--g);font-size:.72rem;padding:6px 10px" onclick="calcScore(1,0)">&#x26BD; 1-0</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(0,1)">0-1</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(1,1)">1-1</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(2,0)">2-0</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(2,1)">2-1</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(0,2)">0-2</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(1,2)">1-2</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(2,2)">2-2</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(3,0)">3-0</button>
+      <button class="btn" style="font-size:.72rem;padding:6px 10px" onclick="calcScore(3,1)">3-1</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:.6rem;color:var(--dm);font-family:var(--mono)">Custom :</span>
+      <input class="inp" id="customH" type="number" min="0" max="9" value="0" style="width:46px;text-align:center;padding:5px"/>
+      <span style="color:var(--dm)">-</span>
+      <input class="inp" id="customA" type="number" min="0" max="9" value="0" style="width:46px;text-align:center;padding:5px"/>
+      <button class="btn bg" style="font-size:.7rem;padding:6px 10px" onclick="calcScore(parseInt(document.getElementById('customH').value)||0,parseInt(document.getElementById('customA').value)||0)">Analyser</button>
+    </div>
   </div>
   <div class="al" id="al00"></div>
   <div id="out00" style="display:none"></div>
+
 
   <!-- MODULE RECALAGE LIVE -->
   <div class="st" style="margin-top:16px">&#x23F1; Recalage Live &#x2014; Mesure de justesse</div>
@@ -1335,10 +1341,40 @@ tr:hover td{background:var(--s2)}
     <button class="bsm" onclick="document.getElementById('modalTk').classList.remove('on')" style="width:100%;margin-top:7px;padding:9px;text-align:center">Annuler</button>
   </div>
 </div>
+
+<!-- LEAGUE EDITOR MODAL -->
+<div id="leagueEditorModal" style="display:none;position:fixed;inset:0;background:rgba(6,10,16,.97);z-index:9998;overflow-y:auto;padding:16px">
+  <div style="max-width:560px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div style="font-size:1.1rem;font-weight:900;letter-spacing:3px;color:var(--g)">🏆 ÉDITEUR DE LIGUES</div>
+        <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:2px">Ligues avec pays inconnu "?" — assigner le bon nom/pays</div>
+      </div>
+      <button onclick="closeLeagueEditor()" style="background:var(--s2);border:1px solid var(--bd);color:var(--tx);border-radius:7px;padding:8px 14px;font-family:var(--font);font-weight:700;cursor:pointer">✕ Fermer</button>
+    </div>
+    <div style="background:rgba(61,155,255,.06);border:1px solid rgba(61,155,255,.2);border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:.62rem;color:var(--b);font-family:var(--mono);line-height:1.6">
+      💡 Pour chaque ligue, vérifie les matchs afin d'identifier la compétition.<br>
+      Entre le nom exact tel qu'api-football l'utilise pour fusionner les données.
+    </div>
+    <div style="margin-bottom:10px;display:flex;gap:8px">
+      <input class="inp" id="leagueSearch" placeholder="Filtrer les ligues..." oninput="renderLeagueEditor()" style="flex:1"/>
+      <select class="inp" id="leagueFilter" onchange="renderLeagueEditor()" style="width:130px">
+        <option value="unknown">Pays = ?</option>
+        <option value="all">Toutes les ligues</option>
+      </select>
+    </div>
+    <div id="leagueEditorList"></div>
+    <div id="leagueEditorStatus" style="min-height:30px"></div>
+  </div>
+</div>
+
 </div><!-- end .app -->
 <script>
 // ═══════════════════════════════════ CONSTANTS & STATE ═══
-var DB_KEY='fsa_db_v5',CFG_KEY='fsa_cfg_v6',RES_KEY='fsa_res_v1',TRACK_KEY='fsa_track_v2',TK_KEY='fsa_tickets_v1',CALIB_KEY='fsa_calib_v1',AN_KEY='btts_h_v1';
+var DB_KEY='fsa_db_v5',CFG_KEY='fsa_cfg_v6',RES_KEY='fsa_res_v1',TRACK_KEY='fsa_track_v2',TK_KEY='fsa_tickets_v1',CALIB_KEY='fsa_calib_v1',AN_KEY='btts_h_v1',SCORE_CORR_KEY='fsa_score_corr_v1';
+
+
+
 var PROXIES=['','https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
 var API='https://v3.football.api-sports.io';
 var TERM=['FT','AET','PEN','AWD','WO','CANC','ABD','SUSP','PST'],LIVE=['1H','HT','2H','ET','BT','P','INT','LIVE'];
@@ -1348,6 +1384,7 @@ var stopFlag=false,modalMatch=null,currentTickets=[],modalTkIdx=-1;
 var cfg={apiKey:'',groqKey:'',oddsApiKey:'',tz:0};
 var oddsFormat='decimal';
 var allMatchsCache=[],tdMkt='auto',statsMkt='totaux',fiabView='resume';
+var recalageActive=false;
 var ctxBonus=0,stakeHMul=1,stakeAMul=1,meteoMul=1,currentBttsProb=0.5;
 var calibratedWeights=null,aiModeActive=false;
 var DEFAULT_WEIGHTS={hist:.25,stats:.30,fs:.25,xg:.15,ctx:.05};
@@ -1360,12 +1397,168 @@ function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()
 function nAgo(n){var d=new Date();d.setDate(d.getDate()-n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function autoTz(){return -Math.round(new Date().getTimezoneOffset()/60)}
 function getTz(){return(cfg.tz!==undefined&&!isNaN(cfg.tz))?cfg.tz:0}
-function getDB(){try{return JSON.parse(localStorage.getItem(DB_KEY)||'{}')}catch(e){return{}}}
-function setDB(db){localStorage.setItem(DB_KEY,JSON.stringify(db))}
+// ══════════════════════════════════════════════
+// BASE DE DONNÉES — IndexedDB (pas de limite)
+// ══════════════════════════════════════════════
+var _dbIDB=null;
+var _dbCache=null;
+
+async function openDBIDB(){
+  if(_dbIDB)return _dbIDB;
+  return new Promise(function(res,rej){
+    var req=indexedDB.open('fsa_db_idb_v1',1);
+    req.onupgradeneeded=function(e){
+      var db=e.target.result;
+      if(!db.objectStoreNames.contains('dates'))
+        db.createObjectStore('dates',{keyPath:'date'});
+    };
+    req.onsuccess=function(e){_dbIDB=e.target.result;res(_dbIDB);};
+    req.onerror=function(){rej(req.error);};
+  });
+}
+
+async function loadDBFromIDB(){
+  try{
+    var db=await openDBIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('dates','readonly');
+      var req=tx.objectStore('dates').getAll();
+      req.onsuccess=function(){
+        var result={};
+        (req.result||[]).forEach(function(row){result[row.date]=row.matchs;});
+        _dbCache=result;
+        res(result);
+      };
+      req.onerror=function(){res({});};
+    });
+  }catch(e){return{};}
+}
+
+async function saveDBToIDB(dbObj){
+  _dbCache=dbObj;
+  try{
+    var db=await openDBIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('dates','readwrite');
+      var store=tx.objectStore('dates');
+      store.clear();
+      Object.keys(dbObj).forEach(function(date){
+        store.put({date:date,matchs:dbObj[date]});
+      });
+      tx.oncomplete=function(){res();};
+      tx.onerror=function(){res();};
+    });
+  }catch(e){}
+}
+
+async function saveDateToIDB(date,matchs){
+  if(_dbCache)_dbCache[date]=matchs;
+  try{
+    var db=await openDBIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('dates','readwrite');
+      tx.objectStore('dates').put({date:date,matchs:matchs});
+      tx.oncomplete=function(){res();};
+      tx.onerror=function(){res();};
+    });
+  }catch(e){}
+}
+
+async function deleteDateFromIDB(date){
+  if(_dbCache)delete _dbCache[date];
+  try{
+    var db=await openDBIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('dates','readwrite');
+      tx.objectStore('dates').delete(date);
+      tx.oncomplete=function(){res();};
+      tx.onerror=function(){res();};
+    });
+  }catch(e){}
+}
+
+// Wrappers synchrones (lecture depuis cache mémoire)
+function getDB(){return _dbCache||{};}
+function setDB(db){_dbCache=db;saveDBToIDB(db);} // async en arrière-plan
 function getRes(){try{return JSON.parse(localStorage.getItem(RES_KEY)||'{}')}catch(e){return{}}}
 function setRes(r){localStorage.setItem(RES_KEY,JSON.stringify(r))}
-function getTrack(){try{return JSON.parse(localStorage.getItem(TRACK_KEY)||'[]')}catch(e){return[]}}
-function setTrack(t){localStorage.setItem(TRACK_KEY,JSON.stringify(t))}
+// ══════════════════════════════════════════════
+// TRACKING — IndexedDB (pas de limite de taille)
+// ══════════════════════════════════════════════
+var _trackIDB=null;
+var _trackCache=null; // cache mémoire
+
+async function openTrackIDB(){
+  if(_trackIDB)return _trackIDB;
+  return new Promise(function(res,rej){
+    var req=indexedDB.open('fsa_track_idb_v1',1);
+    req.onupgradeneeded=function(e){
+      var db=e.target.result;
+      if(!db.objectStoreNames.contains('entries'))
+        db.createObjectStore('entries',{keyPath:'id'});
+    };
+    req.onsuccess=function(e){_trackIDB=e.target.result;res(_trackIDB);};
+    req.onerror=function(){rej(req.error);};
+  });
+}
+
+async function getTrackIDB(){
+  if(_trackCache)return _trackCache;
+  try{
+    var db=await openTrackIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('entries','readonly');
+      var req=tx.objectStore('entries').getAll();
+      req.onsuccess=function(){_trackCache=req.result||[];res(_trackCache);};
+      req.onerror=function(){res([]);};
+    });
+  }catch(e){return[];}
+}
+
+async function setTrackIDB(arr){
+  _trackCache=arr;
+  try{
+    var db=await openTrackIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('entries','readwrite');
+      var store=tx.objectStore('entries');
+      store.clear();
+      arr.forEach(function(e){store.put(e);});
+      tx.oncomplete=function(){res();};
+      tx.onerror=function(){res();};
+    });
+  }catch(e){}
+}
+
+async function appendTrackIDB(entry){
+  if(_trackCache)_trackCache.push(entry);
+  try{
+    var db=await openTrackIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('entries','readwrite');
+      tx.objectStore('entries').put(entry);
+      tx.oncomplete=function(){res();};
+      tx.onerror=function(){res();};
+    });
+  }catch(e){}
+}
+
+async function clearTrackIDB(){
+  _trackCache=null;
+  try{
+    var db=await openTrackIDB();
+    return new Promise(function(res){
+      var tx=db.transaction('entries','readwrite');
+      tx.objectStore('entries').clear();
+      tx.oncomplete=function(){res();};
+      tx.onerror=function(){res();};
+    });
+  }catch(e){}
+}
+
+// Wrappers synchrones de compatibilité (lecture depuis cache)
+function getTrack(){return _trackCache||[];}
+function setTrack(t){_trackCache=t;setTrackIDB(t);} // async en arrière-plan
 function getTickets(){try{return JSON.parse(localStorage.getItem(TK_KEY)||'[]')}catch(e){return[]}}
 function setTickets(t){localStorage.setItem(TK_KEY,JSON.stringify(t))}
 function getCfg(){try{return JSON.parse(localStorage.getItem(CFG_KEY)||'{}')}catch(e){return{}}}
@@ -1455,35 +1648,68 @@ async function deleteAnalysis(id){
 // ═══════════════════════════════════ API ═══
 async function apiCall(endpoint,params){
   if(!cfg.apiKey)return null;
-  var url=new URL(API+endpoint);
-  Object.keys(params).forEach(function(k){url.searchParams.set(k,params[k])});
   var hdrs={'x-apisports-key':cfg.apiKey,'x-rapidapi-key':cfg.apiKey};
   var errors=[];
-  for(var pi=0;pi<PROXIES.length;pi++){
-    try{
-      var fetchUrl=PROXIES[pi]===''?url.toString():PROXIES[pi]+encodeURIComponent(url.toString());
-      var ctrl=new AbortController();
-      var timer=setTimeout(function(){ctrl.abort();},12000);
-      var r=await fetch(fetchUrl,{headers:hdrs,signal:ctrl.signal});
-      clearTimeout(timer);
-      if(r.ok){
-        var d=await r.json();
-        if(d&&d.response!==undefined)return d;
-        if(d&&d.errors&&Object.keys(d.errors).length){
-          errors.push('API error: '+JSON.stringify(d.errors));
-          break; // erreur API réelle, pas la peine d'essayer les autres proxies
-        }
-        errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+': réponse invalide');
-      }else{
-        errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+': HTTP '+r.status);
+
+  // 1. Cloudflare Worker (priorité — pas de CORS, fiable)
+  try{
+    var query=Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k])}).join('&');
+    var workerUrl='https://fspa-proxy.manikantan7070.workers.dev?target=football&path='+encodeURIComponent(endpoint)+'&query='+encodeURIComponent(query);
+    var ctrl0=new AbortController();
+    var t0=setTimeout(function(){ctrl0.abort();},12000);
+    var r0=await fetch(workerUrl,{headers:hdrs,signal:ctrl0.signal});
+    clearTimeout(t0);
+    if(r0.ok){
+      var d0=await r0.json();
+      if(d0&&d0.response!==undefined){
+        if(d0.errors&&Object.keys(d0.errors).length){errors.push('API error: '+JSON.stringify(d0.errors));}
+        else return d0;
       }
-    }catch(e){
-      errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+': '+(e.name==='AbortError'?'timeout 12s':e.message));
+    } else {errors.push('worker: HTTP '+r0.status);}
+  }catch(e0){errors.push('worker: '+(e0.name==='AbortError'?'timeout':e0.message));}
+
+  // 2. Proxies publics en fallback
+  var url=new URL(API+endpoint);
+  Object.keys(params).forEach(function(k){url.searchParams.set(k,params[k])});
+  var urlWithKey=new URL(API+endpoint);
+  Object.keys(params).forEach(function(k){urlWithKey.searchParams.set(k,params[k])});
+  urlWithKey.searchParams.set('apiKey',cfg.apiKey);
+
+  for(var pi=0;pi<PROXIES.length;pi++){
+    var urlsToTry=pi===0
+      ?[url.toString()]
+      :[PROXIES[pi]+encodeURIComponent(url.toString()),
+        PROXIES[pi]+encodeURIComponent(urlWithKey.toString())];
+    for(var ui=0;ui<urlsToTry.length;ui++){
+      try{
+        var ctrl=new AbortController();
+        var timer=setTimeout(function(){ctrl.abort();},12000);
+        var fetchOpts={signal:ctrl.signal};
+        if(pi===0||ui===0)fetchOpts.headers=hdrs;
+        var r=await fetch(urlsToTry[ui],fetchOpts);
+        clearTimeout(timer);
+        if(r.ok){
+          var d=await r.json();
+          if(d&&d.response!==undefined){
+            if(d.response.length>0)return d;
+            var errDetail=d.errors?JSON.stringify(d.errors):'aucun';
+            errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+(ui>0?' (qparam)':'')+': response[] errors='+errDetail);
+            if(d.errors&&Object.keys(d.errors).length){break;}
+            return d;
+          }
+          errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+(ui>0?' (qparam)':'')+': pas de champ response');
+        }else{
+          errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+(ui>0?' (qparam)':'')+': HTTP '+r.status);
+        }
+      }catch(e){
+        errors.push('proxy '+(pi===0?'direct':PROXIES[pi])+(ui>0?' (qparam)':'')+': '+(e.name==='AbortError'?'timeout 12s':e.message));
+      }
     }
   }
   apiCall._lastError=errors.join(' | ');
   return null;
 }
+
 
 // ═══════════════════════════════════ UI HELPERS ═══
 // ── openModal ──
@@ -1502,7 +1728,7 @@ function saveResult(){
   var h=parseInt(document.getElementById('moSH').value,10),a=parseInt(document.getElementById('moSA').value,10);
   if(isNaN(h)||isNaN(a)){alert('Entre les deux scores');return}
   var r=getRes();r[modalMatch.id]={h:h,a:a};setRes(r);
-  if(modalMatch._pred){var track=getTrack();if(!track.find(function(t){return t.id===modalMatch.id})){track.push(buildTrackEntry({id:modalMatch.id,home:modalMatch.home,away:modalMatch.away,league:modalMatch.league||'?',country:modalMatch.country||'?'},modalMatch._pred,modalMatch._seuil||seuilTd,h,a));setTrack(track)}}
+  if(modalMatch._pred){var track=getTrack();if(!track.find(function(t){return t.id===modalMatch.id})){var ne=buildTrackEntry({id:modalMatch.id,home:modalMatch.home,away:modalMatch.away,league:modalMatch.league||'?',country:modalMatch.country||'?'},modalMatch._pred,modalMatch._seuil||seuilTd,h,a);track.push(ne);_trackCache=track;appendTrackIDB(ne);}}
   document.getElementById('modal').classList.remove('on');renderMatchsList();
 }
 
@@ -1583,9 +1809,16 @@ function computeAndSaveCalib(entries,s){
 
 // ── buildTrackEntry ──
 function buildTrackEntry(m,pred,s,h,a){
-  // Champs minimaux pour économiser localStorage (limite ~5MB mobile)
-  // Les booléens résultat sont calculés à la volée depuis rH/rA/seuil
-  return{id:m.id,dt:m.date||today(),ho:m.home,aw:m.away,lg:m.league||'?',s:s,
+  // v2 : stocke les signaux par marché en plus des prédictions
+  // ms = mktSignals compressé : {over:{c,n}, btts:{c,n}, ...}
+  var ms=null;
+  if(pred.mktSignals){
+    ms={};
+    var mk=pred.mktSignals;
+    var mks=['over','under','btts','bttsN','v1','x','v2','dc1x','dcx2','dc12','csH','csA','hmsc','amsc'];
+    mks.forEach(function(k){if(mk[k])ms[k]={c:mk[k].conv,n:mk[k].nbSig};});
+  }
+  return{id:m.id,dt:m.date||today(),ho:m.home,aw:m.away,lg:m.league||'?',co:m.country||'?',s:s,
     rH:h,rA:a,
     pP:pred.plus!==null?Math.round(pred.plus*100):null,
     pU:pred.under!==null?Math.round(pred.under*100):null,
@@ -1601,23 +1834,54 @@ function buildTrackEntry(m,pred,s,h,a){
     p1x:pred.dc1x!==null?Math.round(pred.dc1x*100):null,
     px2:pred.dcx2!==null?Math.round(pred.dcx2*100):null,
     p12:pred.dc12!==null?Math.round(pred.dc12*100):null,
-    cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0};
+    cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0,
+    ms:ms,_v2:true};
 }
 // Accesseurs de compatibilité pour le code existant qui lit les anciens noms de champs
 function tkCompat(t){
-  if(t.home!==undefined)return t; // déjà ancien format
+  if(t.home!==undefined)return t; // déjà ancien format (très vieux)
   var tot=t.rH+t.rA,s=t.s;
-  return{id:t.id,date:t.dt,home:t.ho,away:t.aw,league:t.lg,country:'?',seuil:s,
+  // Helper : récupère convergence d'un marché depuis ms (v2) ou fallback ns (v1)
+  function mktConv(mktKey){
+    if(t.ms&&t.ms[mktKey])return t.ms[mktKey].c;
+    return t.cv||0; // fallback v1 : convergence globale
+  }
+  function mktNbSig(mktKey){
+    if(t.ms&&t.ms[mktKey])return t.ms[mktKey].n;
+    return t.ns||0;
+  }
+  return{id:t.id,date:t.dt,home:t.ho,away:t.aw,league:t.lg,country:t.co||'?',seuil:s,
     rH:t.rH,rA:t.rA,rTotal:tot,rV1x2:t.rH>t.rA?'V1':t.rH<t.rA?'V2':'X',rBtts:t.rH>0&&t.rA>0,
     rPlus:tot>s,rUnder:tot<=s,rCsH:t.rA===0,rCsA:t.rH===0,rHmsc:t.rH>0,rAmsc:t.rA>0,
     rDc1x:t.rH>=t.rA,rDcx2:t.rA>=t.rH,rDc12:t.rH!==t.rA,
     pPlus:t.pP,pUnder:t.pU,pV1:t.pV1,pX:t.pX,pV2:t.pV2,
     pBtts:t.pB,pBttsNon:t.pBN,pCsH:t.pCH,pCsA:t.pCA,
     pHmsc:t.pH,pAmsc:t.pA,pDc1x:t.p1x,pDcx2:t.px2,pDc12:t.p12,
-    pConf:t.cf,pConv:t.cv,pNbSig:t.ns,auto:true,
+    pConf:t.cf,pConv:t.cv,pNbSig:t.ns,auto:true,_v2:t._v2||false,
+    // Signaux par marché (v2 uniquement — fallback convergence globale pour v1)
+    convOver:mktConv('over'),nbSigOver:mktNbSig('over'),
+    convBtts:mktConv('btts'),nbSigBtts:mktNbSig('btts'),
+    convBttsN:mktConv('bttsN'),nbSigBttsN:mktNbSig('bttsN'),
+    convV1:mktConv('v1'),convX:mktConv('x'),convV2:mktConv('v2'),nbSigV1x2:mktNbSig('v1'),
+    convDc1x:mktConv('dc1x'),convDcx2:mktConv('dcx2'),convDc12:mktConv('dc12'),
+    convCsH:mktConv('csH'),convCsA:mktConv('csA'),
+    convHmsc:mktConv('hmsc'),convAmsc:mktConv('amsc'),
     moyBH:null,moyBA:null,scenarioScores:null,scenarioType:null};
 }
 function getTrackCompat(){return getTrack().map(tkCompat);}
+
+// Retourne la convergence par marché depuis une entrée de tracking compatible
+function tkMktConv(t,mktId){
+  var map={
+    over:'convOver',under:'convOver',plus:'convOver',
+    btts:'convBtts',bttsN:'convBttsN',
+    v1:'convV1',x:'convX',v2:'convV2',
+    dc1x:'convDc1x',dcx2:'convDcx2',dc12:'convDc12',
+    csH:'convCsH',csA:'convCsA',hmsc:'convHmsc',amsc:'convAmsc'
+  };
+  var key=map[mktId]||'pNbSig';
+  return t[key]!==undefined?t[key]:(t.pNbSig||0);
+}
 
 // ── setFiabView ──
 function setFiabView(v){
@@ -1950,12 +2214,13 @@ function setSort(key){
   if(btn)btn.classList.add('on');renderComps();
 }
 function majDB(){
-  var db=getDB(),j=Object.keys(db).length;
+  var db=_dbCache||{};
+  var j=Object.keys(db).length;
   var m=Object.values(db).reduce(function(s,v){return s+(v.length||0)},0);
   var l=new Set(Object.values(db).reduce(function(a,v){return a.concat(v.map(function(x){return x.league}))},[])).size;
-  document.getElementById('dbM').textContent=m;
-  document.getElementById('dbJ').textContent=j;
-  document.getElementById('dbL').textContent=l;
+  var dbM=document.getElementById('dbM');if(dbM)dbM.textContent=m;
+  var dbJ=document.getElementById('dbJ');if(dbJ)dbJ.textContent=j;
+  var dbL=document.getElementById('dbL');if(dbL)dbL.textContent=l;
 }
 function setConvFilter(v){
   convFilterVal=v;
@@ -2024,22 +2289,46 @@ function importDB(ev,force){
   var r=new FileReader();
   r.onload=function(e){
     try{
-      var data=JSON.parse(e.target.result),existing=getDB(),added=0,updated=0,skipped=0;
-      Object.keys(data).forEach(function(date){
-        var ms=data[date];
-        if(!existing[date]||existing[date].length===0){existing[date]=ms;added++}
-        else if(force||ms.length>existing[date].length){existing[date]=ms;updated++}
-        else skipped++;
-      });
-      setDB(existing);majDB();
-      showAl('cfgAl','ok','Import: '+added+' ajoutés, '+updated+' maj, '+skipped+' ignorés');
-      setTimeout(function(){hideAl('cfgAl')},4000);
-    }catch(err){showAl('cfgAl','er','Fichier invalide')}
+      var data=JSON.parse(e.target.result);
+      if(typeof data!=='object'||Array.isArray(data))throw new Error('Format invalide — attendu objet avec dates comme clés');
+      var dates=Object.keys(data);
+      if(!dates.length)throw new Error('Fichier vide');
+
+      var existing=getDB(),added=0,updated=0,skipped=0,storeFailed=0;
+      showAl('cfgAl','in','Import en cours... 0/'+dates.length);
+
+      // Import par batch asynchrone pour ne pas geler l'UI
+      var BATCH=50,bi=0;
+      function nextImportBatch(){
+        var end=Math.min(bi+BATCH,dates.length);
+        for(var di=bi;di<end;di++){
+          var date=dates[di];
+          var ms=data[date];
+          if(!existing[date]||existing[date].length===0){existing[date]=ms;added++;}
+          else if(force||ms.length>existing[date].length){existing[date]=ms;updated++;}
+          else skipped++;
+        }
+        bi=end;
+        if(bi<dates.length){
+          showAl('cfgAl','in','Import... '+bi+'/'+dates.length);
+          setTimeout(nextImportBatch,0);
+          return;
+        }
+        // Écriture via IDB (pas de limite)
+        _dbCache=existing;
+        saveDBToIDB(existing).then(function(){majDB();});
+        var msg='✅ Import: '+added+' ajoutés, '+updated+' maj, '+skipped+' ignorés';
+        if(storeFailed)msg+=' (⚠ '+storeFailed+' dates non sauvegardées — stockage plein)';
+        showAl('cfgAl','ok',msg);
+        setTimeout(function(){hideAl('cfgAl');},6000);
+      }
+      nextImportBatch();
+    }catch(err){showAl('cfgAl','er','Fichier invalide : '+err.message);}
   };r.readAsText(f);ev.target.value='';
 }
 function clearDB(){
   if(!confirm('Effacer toutes les données?'))return;
-  localStorage.removeItem(DB_KEY);localStorage.removeItem(RES_KEY);localStorage.removeItem(TRACK_KEY);majDB();
+  _dbCache={};_trackCache=null;Promise.all([saveDBToIDB({}),clearTrackIDB()]).then(function(){majDB();});localStorage.removeItem(DB_KEY);localStorage.removeItem(RES_KEY);localStorage.removeItem(TRACK_KEY);
   showAl('cfgAl','in','Données effacées');setTimeout(function(){hideAl('cfgAl')},2500);
 }
 
@@ -2089,7 +2378,7 @@ async function lancer(force){
         var nNS=ms.filter(function(x){return TERM.indexOf(x.status)<0&&LIVE.indexOf(x.status)<0}).length;
         addLog(date+' - '+ms.length+' matchs'+(nNS?' (⚠ '+nNS+' NS)':''),'var(--g)');
       }
-      if(ms.length>0){db[date]=ms;setDB(db)}
+      if(ms.length>0){if(_dbCache)_dbCache[date]=ms;else{var _tmp=getDB();_tmp[date]=ms;_dbCache=_tmp;}saveDateToIDB(date,ms);}
       j++;m+=ms.length;
     }
     setS();if(i<dates.length-1&&!stopFlag)await sleep(500);
@@ -2102,39 +2391,7 @@ async function lancer(force){
 function stopCol(){stopFlag=true;document.getElementById('btnStop').style.display='none'}
 
 // ═══════════════════════════════════ LOAD MATCHS (onglet Matchs) ═══
-async function loadMatchs(mode){
-  var date=document.getElementById('tdDate').value;
-  if(!date){showAl('tdAl','er','Sélectionne une date');return}
-  var tz=getTz(),db=getDB();
-  if(mode==='local'){
-    if(!db[date]||!db[date].length){
-      showAl('tdAl','er','Aucune donnée en base pour cette date. Utilise le bouton "API ↻".');
-    }else{
-      hideAl('tdAl');
-      renderMatchsList();
-    }
-    return;
-  }
-  // mode === 'api'
-  if(!cfg.apiKey){showAl('tdAl','er','Entre ta clé API dans Config');return}
-  hideAl('tdAl');
-  document.getElementById('tdLd').classList.add('on');
-  var data=await apiCall('/fixtures',{date:date});
-  document.getElementById('tdLd').classList.remove('on');
-  if(!data){
-    showAl('tdAl','er','Erreur API: '+(apiCall._lastError||'inconnue'));
-    return;
-  }
-  var matchs=(data.response||[]).map(function(f){return parseFix(f,tz)});
-  if(!matchs.length){
-    showAl('tdAl','in','Aucun match trouvé pour cette date.');
-    return;
-  }
-  db[date]=matchs;
-  setDB(db);
-  hideAl('tdAl');
-  renderMatchsList();
-}
+
 
 // ═══════════════════════════════════ TEAM CACHE ═══
 function buildTeamCache(){
@@ -2284,7 +2541,12 @@ function ligBiasCorrection(ligStat,globalHistRate,liveRaw){
 function weightedLive(fn,lig,h,dw,liveVal){
   var vals=[];var vL=fn(lig),vH=fn(h),vD=fn(dw);
   if(vL!==null)vals.push([vL,.55]);if(vH!==null)vals.push([vH,.25]);if(vD!==null)vals.push([vD,.20]);
-  if(liveVal!==null&&vL!==null)vals.push([liveVal,.10]);
+  // Recalage live : s'applique dès qu'il y a une valeur live, que la ligue soit connue ou non
+  // Si ligue connue : poids 0.10 (complément), si ligue inconnue : poids 0.40 (signal principal)
+  if(liveVal!==null){
+    var liveW=vL===null&&vH===null&&vD===null?0.60:(vL===null?0.40:0.10);
+    vals.push([liveVal,liveW]);
+  }
   if(!vals.length)return null;
   var sw=vals.reduce(function(a,v){return a+v[1]},0);
   return vals.reduce(function(a,v){return a+v[0]*v[1]/sw},0);
@@ -2326,6 +2588,35 @@ function predict(match,cache,s,liveCtx){
   var sigD=dw&&dw.total>=3?dw[pkOver(s)]/dw.total:null;
   var conv=0,nbSig=0;
   if(sigL!==null){nbSig++;if(sigL>0.5)conv++}if(sigH!==null){nbSig++;if(sigH>0.5)conv++}if(sigD!==null){nbSig++;if(sigD>0.5)conv++}
+
+  // ── Signaux par marché (convergence propre à chaque marché) ──
+  function mktSigs(stKey,threshold){
+    threshold=threshold||0.5;
+    var sl=lig&&lig.total>=3?pct(lig,stKey):null;
+    var sh=h&&h.total>=3?pct(h,stKey):null;
+    var sd=dw&&dw.total>=3?pct(dw,stKey):null;
+    var c=0,n=0;
+    if(sl!==null){n++;if(sl>threshold)c++;}
+    if(sh!==null){n++;if(sh>threshold)c++;}
+    if(sd!==null){n++;if(sd>threshold)c++;}
+    return{sigL:sl,sigH:sh,sigD:sd,conv:c,nbSig:n};
+  }
+  var mktSignals={
+    over:    mktSigs(pkOver(s)),
+    under:   mktSigs(pkUnder(s)),
+    btts:    mktSigs('bO'),
+    bttsN:   mktSigs('bN'),
+    v1:      mktSigs('v1'),
+    x:       mktSigs('x'),
+    v2:      mktSigs('v2'),
+    dc1x:    mktSigs('dc1x',0.6),
+    dcx2:    mktSigs('dcx2',0.6),
+    dc12:    mktSigs('dc12',0.6),
+    csH:     mktSigs('csH',0.3),
+    csA:     mktSigs('csA',0.3),
+    hmsc:    mktSigs('hmsc',0.6),
+    amsc:    mktSigs('amsc',0.6)
+  };
   // Cherche le signal heure : même heure ou heure précédente la plus récente
   var liveHourSt=null;
   if(liveCtx){
@@ -2360,6 +2651,7 @@ function predict(match,cache,s,liveCtx){
     conf:lig?Math.min(100,Math.round(lig.total/50*100)):0,ligTotal:lig?lig.total:0,
     moyButs:lig&&lig.total?(lig.buts/lig.total).toFixed(2):null,
     sigL:sigL,sigH:sigH,sigD:sigD,convergence:conv,nbSig:nbSig,
+    mktSignals:mktSignals,
     liveActive:liveActive,liveHour:liveHourSt,liveDay:liveDaySt,
     seuilAdapte:seuilAdaptatif(lig),allMarkets:allM,bestMarket:allM.length?allM[0]:null,
     ligStats:lig?{over:lig.total?Math.round(lig[pkOver(s)]/lig.total*100):null,under:lig.total?Math.round(lig[pkUnder(s)]/lig.total*100):null,bttsO:lig.total?Math.round(lig.bO/lig.total*100):null,bttsN:lig.total?Math.round(lig.bN/lig.total*100):null,v1:lig.total?Math.round(lig.v1/lig.total*100):null,x:lig.total?Math.round(lig.x/lig.total*100):null,v2:lig.total?Math.round(lig.v2/lig.total*100):null,dc1x:lig.total?Math.round(lig.dc1x/lig.total*100):null,dcx2:lig.total?Math.round(lig.dcx2/lig.total*100):null,dc12:lig.total?Math.round(lig.dc12/lig.total*100):null,csH:lig.total?Math.round(lig.csH/lig.total*100):null,csA:lig.total?Math.round(lig.csA/lig.total*100):null,hmsc:lig.total?Math.round(lig.hmsc/lig.total*100):null,amsc:lig.total?Math.round(lig.amsc/lig.total*100):null}:null,
@@ -2371,6 +2663,20 @@ function getCalib(){try{return JSON.parse(localStorage.getItem(CALIB_KEY)||'{}')
 function setCalib(c){localStorage.setItem(CALIB_KEY,JSON.stringify(c))}
 function resetCalib(){if(!confirm('Réinitialiser tous les facteurs de calibration?'))return;localStorage.removeItem(CALIB_KEY);showAl('fiabAl','ok','Calibration réinitialisée.');setTimeout(function(){hideAl('fiabAl')},3000)}
 function getCalibFactor(market){var c=getCalib();return c[market]!==undefined?c[market]:1.0}
+function getScoreCorr(){try{return JSON.parse(localStorage.getItem(SCORE_CORR_KEY)||'{}')}catch(e){return{}}}
+function setScoreCorr(d){localStorage.setItem(SCORE_CORR_KEY,JSON.stringify(d))}
+// Sauvegarde les corrélations d'un score dans le store persistant
+function saveScoreCorrData(targetH,targetA,corrArr,baseRate){
+  var store=getScoreCorr();
+  var key=targetH+'-'+targetA;
+  store[key]={
+    baseRate:baseRate,
+    corr:{},
+    saved:new Date().toISOString().slice(0,10)
+  };
+  corrArr.forEach(function(c){store[key].corr[c.k]=c.rate/100;});
+  setScoreCorr(store);
+}
 function applyCalib(val,market){if(val===null)return null;return Math.min(1,Math.max(0,val*getCalibFactor(market)))}
 
 // ═══════════════════════════════════ POISSON / DIXON-COLES ═══
@@ -3049,7 +3355,8 @@ function buildMatchHTML(m,pred,s){
   var calibBadge=hasCalib?'<span class="calib-badge cb-ok" style="margin-left:5px">CALIBRÉ</span>':'';
   var convCls='conv-'+pred.convergence;
   function sigBadge(lbl,val){if(val===null)return'<span class="sig sig-d">'+lbl+': ?</span>';var v=Math.round(val*100);var cl=v>=60?'sig-g':v>=45?'sig-y':'sig-r';return'<span class="sig '+cl+'">'+lbl+': '+v+'%</span>'}
-  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="sig-row" style="margin:0;flex:1">'+sigBadge('L',pred.sigL)+sigBadge('H',pred.sigH)+sigBadge('J',pred.sigD)+calibBadge+'</div><span class="conv-star '+convCls+'">'+pred.convergence+'/'+pred.nbSig+' ⚡</span></div>';
+  var _mktSig2=getActiveMktSig(pred,tdMkt);
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="sig-row" style="margin:0;flex:1">'+sigBadge('L',_mktSig2.sigL)+sigBadge('H',_mktSig2.sigH)+sigBadge('J',_mktSig2.sigD)+calibBadge+'</div><span class="conv-star conv-'+_mktSig2.conv+'">'+_mktSig2.conv+'/'+_mktSig2.nbSig+' ⚡</span></div>';
   var sa=pred.seuilAdapte;
   if(sa!==null&&sa!==s)html+='<div style="font-size:.6rem;background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.18);border-radius:5px;padding:3px 7px;margin-bottom:6px;color:var(--y)">Seuil adapté: +'+sa+' (moy '+pred.moyButs+' buts/match)</div>';
   var ligS=pred.ligStats;
@@ -3149,7 +3456,7 @@ async function loadMatchs(source){
           var tz2=getTz();
           var refreshed=refreshData.response.map(function(f){return parseFix(f,tz2)});
           if(refreshed.length>0){
-            var db3=getDB();db3[date]=refreshed;setDB(db3);majDB();
+            if(_dbCache)_dbCache[date]=refreshed;saveDateToIDB(date,refreshed);majDB();
             fx=refreshed;
             document.getElementById('tdLd').classList.remove('on');
             showAl('tdAl','ok',fx.length+' matchs rafraîchis depuis l\'API (statuts mis à jour).');
@@ -3176,9 +3483,11 @@ async function loadMatchs(source){
   }else{
     if(!cfg.apiKey){document.getElementById('tdLd').classList.remove('on');showAl('tdAl','er','Entre ta clé API dans Config');return}
     var data=await apiCall('/fixtures',{date:date});document.getElementById('tdLd').classList.remove('on');
-    if(!data){showAl('tdAl','er','Erreur API. Vérifie ta clé et ton quota.');return}
-    fx=data.response.map(function(f){return parseFix(f,tz)});
-    if(fx.length>0){var db2=getDB();db2[date]=fx;setDB(db2);majDB()}
+    if(!data){showAl('tdAl','er','Erreur API: '+(apiCall._lastError||'inconnue'));return}
+    fx=(data.response||[]).map(function(f){return parseFix(f,tz)});
+    if(!fx.length){showAl('tdAl','er','0 match retourné par l\'API pour le '+date+(apiCall._lastError?' — '+apiCall._lastError:''));return}
+    if(_dbCache)_dbCache[date]=fx;
+    saveDateToIDB(date,fx);majDB();
     showAl('tdAl','ok',fx.length+' matchs chargés et sauvegardés.');
   }
   // Stocker TOUS les matchs - le filtre mode s'applique dans renderMatchsList
@@ -3195,7 +3504,10 @@ async function loadMatchs(source){
   document.getElementById('tSoo').textContent=fx.filter(function(f){return TERM.indexOf(f.status)<0&&LIVE.indexOf(f.status)<0}).length;
   document.getElementById('tDon').textContent=fx.filter(function(f){return TERM.indexOf(f.status)>=0}).length;
   document.getElementById('tdSum').style.display='block';
-  renderMatchsList();
+  try{renderMatchsList();}
+  catch(e){
+    document.getElementById('tdList').innerHTML='<div style="color:var(--r);padding:16px;font-size:.75rem;font-family:var(--mono)">Erreur rendu: '+e.message+'</div>';
+  }
 }
 function toggleAllGroups(open){
   document.querySelectorAll('.lg-body').forEach(function(b){b.classList.toggle('open',open)});
@@ -3224,6 +3536,21 @@ function renderMatchsList(){
     if(convFilterVal===0)return true;
     return(m._pred?m._pred.convergence:0)>=convFilterVal;
   });
+
+  // Appliquer le recalage live si actif
+  if(recalageActive&&fx.length){
+    var _liveCtxV2=buildLiveContextV2(allMatchsCache,seuilTd);
+    if(_liveCtxV2){
+      fx.forEach(function(m){
+        if(m._pred){
+          var rp=applyRecalageToMatch(m,m._pred,_liveCtxV2,seuilTd);
+          m._predRecale=rp;
+        }
+      });
+    }
+  } else {
+    fx.forEach(function(m){m._predRecale=null;});
+  }
 
   if(!fx.length){
     list.innerHTML='<div style="color:var(--dm);padding:20px;text-align:center;font-size:.8rem;font-family:var(--mono)">Aucun match pour ce filtre</div>';
@@ -3271,7 +3598,8 @@ function renderMatchsList(){
       var midx=window._matchRefs.length;
       window._matchRefs.push(m);
 
-      var pred=m._pred;
+      var pred=(recalageActive&&m._predRecale)?m._predRecale:m._pred;
+      if(recalageActive&&m._predRecale)pred.recalageActif=true;
       var res=results[m.id];
       var isLive=LIVE.indexOf(m.status)>=0;
       var isDone=TERM.indexOf(m.status)>=0;
@@ -3291,10 +3619,12 @@ function renderMatchsList(){
           '<div class="mte"><div class="tn th">'+m.home+'</div><div class="msc">'+score+'</div><div class="tn ta">'+m.away+'</div></div>'+
           html+
           '<div style="display:flex;gap:6px;margin-top:6px">'+
-          (!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir r\u00e9sultat</button>':'')+
-          '<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">\u26a1 Analyser</button>'+
-          '<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">Sc\u00e9nario</button>'+
-          '</div>';
+          (!res?'<button class="bsm" onclick="openModal('+midx+')" style="flex:1;padding:7px;text-align:center">Saisir résultat</button>':'')+
+          '<button class="bsm" onclick="loadMatchToAnalyse(window._matchRefs['+midx+'])" style="flex:1;padding:7px;text-align:center;border-color:var(--p);color:var(--p)">⚡ Analyser</button>'+
+          '<button class="bsm" onclick="openScenarioModal('+midx+')" style="flex:1;padding:7px;text-align:center;border-color:var(--teal);color:var(--teal)">Scénario</button>'+
+          '</div>'+
+          '<div id="ai-block-'+m.id+'" style="display:none;margin-top:6px"></div>'+
+          (pred?'<button class="bsm" id="ai-btn-'+m.id+'" onclick="analyzeMatchAI(window._matchRefs['+midx+'],\"ai-block-'+m.id+'\",\"ai-btn-'+m.id+'\")" style="width:100%;margin-top:4px;padding:7px;text-align:center;border-color:var(--p);color:var(--p);font-size:.65rem">🤖 Analyse IA</button>':'');
       }catch(e){
         card.innerHTML=
           '<div class="mt-row"><div class="ml">'+m.heure+'</div></div>'+
@@ -3319,7 +3649,8 @@ function buildMatchHTMLFast(m,pred,s,res){
 
   var hasCalib=window._hasCalib;
   var calibBadge=hasCalib?'<span class="calib-badge cb-ok" style="margin-left:5px">CALIBR\u00c9</span>':'';
-  var convCls='conv-'+pred.convergence;
+  var _mktSig=getActiveMktSig(pred,tdMkt);
+  var convCls='conv-'+_mktSig.conv;
 
   function sigBadge(lbl,val){
     if(val===null)return'<span class="sig sig-d">'+lbl+': ?</span>';
@@ -3329,8 +3660,8 @@ function buildMatchHTMLFast(m,pred,s,res){
   }
 
   var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
-    '<div class="sig-row" style="margin:0;flex:1">'+sigBadge('L',pred.sigL)+sigBadge('H',pred.sigH)+sigBadge('J',pred.sigD)+calibBadge+'</div>'+
-    '<span class="conv-star '+convCls+'">'+pred.convergence+'/'+pred.nbSig+' \u26a1</span></div>';
+    '<div class="sig-row" style="margin:0;flex:1">'+sigBadge('L',_mktSig.sigL)+sigBadge('H',_mktSig.sigH)+sigBadge('J',_mktSig.sigD)+calibBadge+'</div>'+
+    '<span class="conv-star '+convCls+'">'+_mktSig.conv+'/'+_mktSig.nbSig+' \u26a1</span></div>';
 
   var sa=pred.seuilAdapte;
   if(sa!==null&&sa!==s)html+='<div style="font-size:.6rem;background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.18);border-radius:5px;padding:3px 7px;margin-bottom:6px;color:var(--y)">Seuil adapt\u00e9: +'+sa+' (moy '+pred.moyButs+' buts/match)</div>';
@@ -3361,6 +3692,44 @@ function buildMatchHTMLFast(m,pred,s,res){
   } else if(tdMkt==='cs'){
     html+='<div class="mkt-section"><div class="mkt-section-title">CS</div><div class="mkt-grid g4r">'+mktBox(pred.csH,'CS Dom')+mktBox(pred.csA,'CS Ext')+mktBox(pred.hmsc,'Dom Mq')+mktBox(pred.amsc,'Ext Mq')+'</div></div>';
   }
+
+  // ── Panneau tous marchés avec signaux ──
+  if(pred.mktSignals){
+    var amId='am-'+m.id;
+    var MG=[
+      {g:'Totaux',mk:[{id:'over',l:'Over '+(m._seuil||seuilTd),v:pred.plus},{id:'under',l:'Under '+(m._seuil||seuilTd),v:pred.under}]},
+      {g:'BTTS',mk:[{id:'btts',l:'BTTS Oui',v:pred.btts},{id:'bttsN',l:'BTTS Non',v:pred.bttsNon}]},
+      {g:'V1 / X / V2',mk:[{id:'v1',l:'Dom',v:pred.v1},{id:'x',l:'Nul',v:pred.x},{id:'v2',l:'Ext',v:pred.v2}]},
+      {g:'DC',mk:[{id:'dc1x',l:'1X',v:pred.dc1x},{id:'dcx2',l:'X2',v:pred.dcx2},{id:'dc12',l:'12',v:pred.dc12}]},
+      {g:'CS / Marque',mk:[{id:'csH',l:'CS Dom',v:pred.csH},{id:'csA',l:'CS Ext',v:pred.csA},{id:'hmsc',l:'Dom Mq',v:pred.hmsc},{id:'amsc',l:'Ext Mq',v:pred.amsc}]}
+    ];
+    var amHtml='<div id="'+amId+'" style="display:none;margin-top:8px;border-top:1px solid var(--bd);padding-top:8px">';
+    amHtml+='<div style="font-size:.55rem;letter-spacing:2px;color:var(--dm);font-family:var(--mono);margin-bottom:6px">TOUS LES MARCHÉS — SIGNAUX L/H/J</div>';
+    amHtml+='<table style="width:100%;border-collapse:collapse;font-size:.62rem">';
+    amHtml+='<tr style="border-bottom:1px solid var(--bd)"><th style="text-align:left;color:var(--dm);font-weight:500;padding:2px 0;font-family:var(--mono);font-size:.55rem">MARCHÉ</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">L</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">H</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">J</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">CONV</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">PRED</th></tr>';
+    MG.forEach(function(grp){
+      amHtml+='<tr><td colspan="6" style="padding-top:5px;color:var(--dm);font-size:.52rem;font-family:var(--mono);letter-spacing:1.5px">'+grp.g+'</td></tr>';
+      grp.mk.forEach(function(mk){
+        if(mk.v===null||mk.v===undefined)return;
+        var sig=pred.mktSignals[mk.id]||{sigL:null,sigH:null,sigD:null,conv:0,nbSig:0};
+        var pct3=Math.round(mk.v*100);
+        var pCol=pct3>=70?'var(--g)':pct3>=55?'var(--y)':pct3>=40?'var(--o)':'var(--r)';
+        var cCol=sig.conv>=3?'var(--g)':sig.conv>=2?'var(--y)':'var(--dm)';
+        function sv(v){if(v===null)return'<td style="text-align:center;color:var(--bd2)">?</td>';var pv=Math.round(v*100);var vc=pv>=60?'var(--g)':pv>=45?'var(--y)':'var(--r)';return'<td style="text-align:center;color:'+vc+'">'+pv+'%</td>';}
+        var isAct=(mk.id===tdMkt||(tdMkt==='auto'&&mk.id==='over')||(tdMkt==='totaux'&&mk.id==='over'));
+        amHtml+='<tr style="border-bottom:1px solid rgba(255,255,255,.03)'+(isAct?';background:rgba(0,229,160,.04)':'')+'">';
+        amHtml+='<td style="padding:3px 0;color:'+(isAct?'var(--g)':'var(--tx)')+'">'+mk.l+'</td>';
+        amHtml+=sv(sig.sigL)+sv(sig.sigH)+sv(sig.sigD);
+        amHtml+='<td style="text-align:center;color:'+cCol+';font-weight:700">'+sig.conv+'/'+sig.nbSig+'</td>';
+        amHtml+='<td style="text-align:right;color:'+pCol+';font-weight:700">'+pct3+'%</td>';
+        amHtml+='</tr>';
+      });
+    });
+    amHtml+='</table></div>';
+    amHtml+='<button onclick="var el=document.getElementById(\''+amId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';this.textContent=el.style.display===\'block\'?'\'▲ Masquer les marchés\':'\'▼ Voir tous les marchés + signaux\'" style="width:100%;margin-top:5px;background:transparent;border:1px solid var(--bd);color:var(--dm);font-size:.6rem;padding:5px;border-radius:6px;cursor:pointer;font-family:var(--mono)">▼ Voir tous les marchés + signaux</button>';
+    html+=amHtml;
+  }
+
 
   // Live badge
   if(pred.liveActive){
@@ -3960,13 +4329,62 @@ function valueEdge(predProb,cote){
 }
 
 // Fuzzy match équipes (The Odds API n'a pas les mêmes noms qu'API-Football)
+// Abréviations courantes pour le matching cross-source
+var TEAM_ALIASES={
+  'psg':'paris saint germain','paris sg':'paris saint germain',
+  'man utd':'manchester united','man united':'manchester united','manutd':'manchester united',
+  'man city':'manchester city','mancity':'manchester city',
+  'atletico':'atletico madrid','atletico de madrid':'atletico madrid',
+  'inter':'inter milan','internazionale':'inter milan',
+  'ac milan':'milan','acmilan':'milan',
+  'sporting cp':'sporting','sporting clube':'sporting',
+  'newcastle utd':'newcastle','newcastle united':'newcastle',
+  'wolves':'wolverhampton','wolverhampton wanderers':'wolverhampton',
+  'tottenham hotspur':'tottenham','spurs':'tottenham',
+  'brighton hove albion':'brighton','brighton and hove albion':'brighton',
+  'west ham united':'west ham','westham':'west ham',
+  'nottingham forest':'nottm forest','nott forest':'nottingham forest',
+  'sheffield utd':'sheffield united','sheff utd':'sheffield united',
+  'leicester city':'leicester','leicester c':'leicester',
+  'aston villa':'aston villa',
+  'rb leipzig':'leipzig','rasenballsport leipzig':'leipzig',
+  'borussia dortmund':'dortmund','bvb':'dortmund',
+  'borussia monchengladbach':'mgladbach','gladbach':'mgladbach',
+  'bayer leverkusen':'leverkusen','bayer 04':'leverkusen',
+  'eintracht frankfurt':'frankfurt','sgf':'frankfurt',
+  'fc barcelona':'barcelona','barca':'barcelona',
+  'real madrid cf':'real madrid','cf real madrid':'real madrid',
+  'sevilla fc':'sevilla','fc sevilla':'sevilla',
+  'real betis balompie':'real betis','betis':'real betis',
+  'villarreal cf':'villarreal',
+  'olympique lyonnais':'lyon','ol':'lyon',
+  'olympique marseille':'marseille','om':'marseille',
+  'stade rennais':'rennes',
+  'as monaco':'monaco',
+  'ogc nice':'nice',
+  'rc strasbourg':'strasbourg',
+  'aj auxerre':'auxerre',
+  'losc':'lille','losc lille':'lille',
+};
+function normalizeTeam(s){
+  if(!s)return '';
+  var n=s.toLowerCase()
+    .replace(/fc|ac|sc|af|if|sk|fk|cf|rc|sv|vfl|vfb|tsg/g,'')
+    .replace(/[^a-z0-9]/g,' ')
+    .replace(/\s+/g,' ').trim();
+  return TEAM_ALIASES[n]||n;
+}
 function teamMatch(a,b){
   if(!a||!b)return false;
-  a=a.toLowerCase().replace(/[^a-z0-9]/g,' ').trim();
-  b=b.toLowerCase().replace(/[^a-z0-9]/g,' ').trim();
-  if(a===b)return true;
-  var aW=a.split(' ').filter(function(w){return w.length>2});
-  var bW=b.split(' ').filter(function(w){return w.length>2});
+  var na=normalizeTeam(a), nb=normalizeTeam(b);
+  if(na===nb)return true;
+  // Contient l'un l'autre (ex: "Lyon" dans "Olympique Lyonnais")
+  if(na.length>=4&&nb.indexOf(na)>=0)return true;
+  if(nb.length>=4&&na.indexOf(nb)>=0)return true;
+  // Mots communs
+  var aW=na.split(' ').filter(function(w){return w.length>2});
+  var bW=nb.split(' ').filter(function(w){return w.length>2});
+  if(!aW.length||!bW.length)return false;
   var common=aW.filter(function(w){return bW.indexOf(w)>=0});
   return common.length>=1&&(common.length/Math.max(aW.length,bW.length))>=0.5;
 }
@@ -4305,19 +4723,21 @@ var _dumpRunning=false;
 var _dumpSaisons=3;
 var _dumpMode='scores'; // 'scores' ou 'scores+xg'
 
-function getDumpDB(){try{return JSON.parse(localStorage.getItem(STATS_DUMP_KEY)||'{}')}catch(e){return{}}}
+function getDumpDB(){if(window._dumpMemory&&Object.keys(window._dumpMemory).length)return window._dumpMemory;try{return JSON.parse(localStorage.getItem(STATS_DUMP_KEY)||'{}')}catch(e){return{}}}
 function setDumpDB(d){
+  // Toujours garder en mémoire vive (pas de limite)
+  window._dumpMemory=d;
   try{
     localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(d));
   }catch(e){
-    // Stockage plein — on garde uniquement les entrées avec score
+    // localStorage plein — on garde en mémoire uniquement, c'est suffisant pour exporter
     try{
       var slim={};
       Object.values(d).forEach(function(e){if(e.sh!==null&&e.sh!==undefined)slim[e.id]=e;});
       localStorage.setItem(STATS_DUMP_KEY,JSON.stringify(slim));
-      showAl('dumpAl','in','Stockage quasi-plein — dump allégé (entrées sans score supprimées)');
+      showAl('dumpAl','in','Stockage local quasi-plein — dump gardé en mémoire. Exporte en JSON maintenant.');
     }catch(e2){
-      showAl('dumpAl','er','Stockage plein — efface le dump ou la base avant de continuer');
+      showAl('dumpAl','in','Stockage local plein — dump en mémoire uniquement. Exporte en JSON avant de quitter la page.');
     }
   }
 }
@@ -4326,17 +4746,33 @@ function getStatsKey(){return cfg.statsApiKey||'';}
 async function statsCall(endpoint,params){
   var key=getStatsKey();
   if(!key)throw new Error('Clé TheStatsAPI manquante — configure-la dans Config');
-  var url=STATS_BASE+endpoint;
+
+  // Construire query string
+  var query='';
   if(params&&Object.keys(params).length)
-    url+='?'+Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
-  var resp=await fetch(url,{headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}});
-  if(!resp.ok){
+    query=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+
+  // Appel via Cloudflare Worker (pas de problème CORS)
+  var workerUrl='https://fspa-proxy.manikantan7070.workers.dev?target=stats&path='+encodeURIComponent(endpoint)+(query?'&query='+encodeURIComponent(query):'');
+
+  try{
+    var ctrl=new AbortController();
+    var timer=setTimeout(function(){ctrl.abort();},20000);
+    var resp=await fetch(workerUrl,{
+      headers:{'Authorization':'Bearer '+key,'Accept':'application/json'},
+      signal:ctrl.signal
+    });
+    clearTimeout(timer);
+    if(resp.ok)return resp.json();
     if(resp.status===401||resp.status===403)throw new Error('Clé invalide ou expirée ('+resp.status+')');
     if(resp.status===429)throw new Error('RATE_LIMIT');
-    if(resp.status===404)return null;
-    throw new Error('Erreur API '+resp.status);
+    // Pour tout autre code, afficher le body pour debug
+    var errBody=await resp.text();
+    throw new Error('HTTP '+resp.status+' : '+errBody.slice(0,150));
+  }catch(e){
+    if(e.name==='AbortError')throw new Error('Timeout — vérifie ta connexion');
+    throw e;
   }
-  return resp.json();
 }
 
 async function safeCall(endpoint,params,nRef){
@@ -4418,7 +4854,8 @@ async function startDump(){
     upd('Récupération des compétitions...',2);
     var compsResp=await safeCall('/football/competitions',{per_page:100,type:'league'},nRef);
     if(!compsResp||!compsResp.data||!compsResp.data.length){
-      showAl('dumpAl','er','Impossible de récupérer les compétitions — vérifie ta clé');
+      var detail=compsResp?JSON.stringify(compsResp).slice(0,200):'null';
+      showAl('dumpAl','er','Réponse compétitions : '+detail);
       return finishDump(nMatches,nXg,nRef[0]);
     }
 
@@ -4529,56 +4966,77 @@ async function startDump(){
     // ── ÉTAPE 5 : Injection en base locale (jour par jour) ───
     upd('Injection en base...',97);
     _dumpIdx=null;buildDumpIdx(dumpDB);
-    var injected=0,injectedXg=0;
-    var db2=getDB();
-    var modifiedDates=[];
-    Object.keys(db2).forEach(function(date){
-      var modified=false;
-      db2[date].forEach(function(m){
-        var e=findInDump(dumpDB,m.home,m.away,date);
-        if(!e)return;
-        // Injecter score uniquement si le match n'en a pas et que le dump en a un
-        if(e.sh!==null&&e.sh!==undefined&&(m.h===null||m.h===undefined)){
-          m.h=e.sh;m.a=e.sa;
-          // NE PAS toucher au statut — laisser l'API gérer ça
-          injected++;modified=true;
-        }
-        // xG
-        if(e.xg&&e.xg.h!==null&&!m._xg){
-          m._xg={home:e.xg.h,away:e.xg.a,npxgHome:e.xg.nh,npxgAway:e.xg.na};
-          injectedXg++;modified=true;
-        }
-      });
-      if(modified)modifiedDates.push(date);
-    });
 
-    // Écrire toutes les dates modifiées en une seule passe
-    if(modifiedDates.length){
-      try{
-        localStorage.setItem(DB_KEY,JSON.stringify(db2));
-      }catch(ex){
-        // Fallback : écrire jour par jour
-        var db4=getDB();
-        modifiedDates.forEach(function(date){
-          try{db4[date]=db2[date];localStorage.setItem(DB_KEY,JSON.stringify(db4));}catch(e2){}
-        });
-      }
+    // Injection asynchrone par batch pour ne pas geler l'UI
+    var db2=getDB();
+    var allDates=Object.keys(db2);
+    var injected=0,injectedXg=0,modifiedDates=[];
+    // Si aucune date en base, skip injection
+    if(!allDates.length){
+      setDumpDB(dumpDB);
+      showAl('dumpAl','ok','✅ '+nMatches+' matchs collectés dans le dump. Utilise "Exporter en JSON" pour les importer en base.');
+      return finishDump(nMatches,nXg,nRef[0]);
     }
 
-    setDumpDB(dumpDB);
-    var msg='✅ '+nMatches+' matchs collectés';
-    if(injected)msg+=' · '+injected+' scores injectés en base';
-    if(injectedXg)msg+=' · '+injectedXg+' xG';
-    showAl('dumpAl','ok',msg);
+    var BATCH=50,bi=0;
 
-  }catch(e){showAl('dumpAl','er','Erreur : '+e.message);}
-  finishDump(nMatches,nXg,nRef[0]);
+    function nextBatch(){
+      var end=Math.min(bi+BATCH,allDates.length);
+      for(var di=bi;di<end;di++){
+        var date=allDates[di];
+        var modified=false;
+        (db2[date]||[]).forEach(function(m){
+          var e=findInDump(dumpDB,m.home,m.away,date);
+          if(!e)return;
+          if(e.sh!==null&&e.sh!==undefined&&(m.h===null||m.h===undefined)){
+            m.h=e.sh;m.a=e.sa;injected++;modified=true;
+          }
+          if(e.xg&&e.xg.h!==null&&!m._xg){
+            m._xg={home:e.xg.h,away:e.xg.a,npxgHome:e.xg.nh,npxgAway:e.xg.na};
+            injectedXg++;modified=true;
+          }
+        });
+        if(modified)modifiedDates.push(date);
+      }
+      bi=end;
+      var pct=97+Math.round((bi/allDates.length)*2);
+      upd('Injection '+bi+'/'+allDates.length+'...',pct);
+      if(bi<allDates.length){
+        setTimeout(nextBatch,0);
+        return;
+      }
+      // Écriture finale
+      try{
+        if(modifiedDates.length){
+          try{
+            localStorage.setItem(DB_KEY,JSON.stringify(db2));
+          }catch(ex){
+            // Fallback par date
+            var db4=getDB();
+            modifiedDates.forEach(function(date){
+              try{db4[date]=db2[date];localStorage.setItem(DB_KEY,JSON.stringify(db4));}catch(e2){}
+            });
+          }
+        }
+        setDumpDB(dumpDB);
+        var msg='✅ '+nMatches+' matchs collectés';
+        if(injected)msg+=' · '+injected+' scores injectés';
+        if(injectedXg)msg+=' · '+injectedXg+' xG';
+        showAl('dumpAl','ok',msg);
+      }catch(e){showAl('dumpAl','er','Erreur écriture : '+e.message);}
+      finishDump(nMatches,nXg,nRef[0]);
+    }
+    nextBatch();
+    return; // finishDump appelé dans nextBatch
+
+  }catch(e){showAl('dumpAl','er','Erreur : '+e.message);finishDump(nMatches,nXg,nRef[0]);}
 }
 
 function finishDump(nMatches,nXg,nReq){
   _dumpRunning=false;
   document.getElementById('btnDump').disabled=false;
   document.getElementById('btnDumpStop').style.display='none';
+  document.getElementById('dumpProgress').style.display='none';
   document.getElementById('dumpReqCount').textContent='Total requêtes : '+nReq;
   renderDumpStats();
 }
@@ -4597,7 +5055,9 @@ function renderDumpStats(){
   html+='<div class="sb"><div class="sv" style="color:var(--b)">'+withScore+'</div><div class="sl">Avec score</div></div>';
   html+='<div class="sb"><div class="sv" style="color:var(--p)">'+withXg+'</div><div class="sl">xG</div></div>';
   html+='</div>';
-  html+='<button class="bsm" onclick="injectDumpIntoMatchCards()" style="width:100%;padding:8px;text-align:center;color:var(--teal,#20c997);border-color:var(--teal,#20c997)">↩ Injecter dans les matchs ouverts</button>';
+  html+='<button class="btn bg" style="width:100%;padding:10px;margin-bottom:6px;font-size:.8rem" onclick="exportDumpAsDB()">📥 Exporter en JSON (import manuel)</button>';
+  html+='<button class="bsm" onclick="injectDumpIntoMatchCards()" style="width:100%;padding:8px;text-align:center;color:var(--teal,#20c997);border-color:var(--teal,#20c997)">Injecter dans les matchs ouverts</button>';
+  html+='<button class="bsm" onclick="diagDump()" style="margin-top:5px;width:100%;padding:8px;text-align:center;color:var(--y);border-color:var(--y)">🔍 Diagnostic matching</button>';
   html+='<button class="bsm" onclick="if(confirm(\'Effacer le dump ?\'))clearDumpDB()" style="margin-top:5px;width:100%;padding:8px;text-align:center;color:var(--r);border-color:var(--r)">Effacer le dump</button>';
   html+='</div>';
   var out=document.getElementById('dumpOut');out.innerHTML=html;out.style.display='block';
@@ -4777,7 +5237,9 @@ function renderSelection(){
       var predVal=pred[mk.predKey];
       if(predVal===null||predVal===undefined)return;
       var predPct=Math.round(predVal*100);
-      if(predPct<selSeuil)return; // sous le seuil prédit
+      // Seuil adaptatif : marchés 1X2 naturellement < 50%, seuil réduit
+      var seuilEffectif=mk.mktGroup==='1x2'?Math.min(selSeuil,40):selSeuil;
+      if(predPct<seuilEffectif)return;
 
       // Fiabilité de ce marché depuis le tracking
       var fiabData=calib[mk.fiabKey]||calib[mk.id]||null;
@@ -5329,72 +5791,138 @@ function get00Stats(){
   });
   return all;
 }
-// Calcule probabilité 0-0 pour badge sur match card
-function compute00Badge(m,pred){
+// Calcule probabilité d'un score exact pour badge / calibration passive
+function computeScoreBadge(targetH,targetA,m,pred){
   var all=window._00stats||get00Stats();
+  var key=targetH+'-'+targetA;
+  var scoreCorr=getScoreCorr();
+  var corrData=scoreCorr[key]||null;
+
+  // ── Score modèle (combinaison de prédictions) ──
   var modelScore=null;
   if(pred){
-    if(pred.csH!=null&&pred.csA!=null){ modelScore=pred.csH*pred.csA; }
+    // Facteurs universels adaptés au score cible
+    var needsCsH=targetA===0; // CS dom si 0 but extérieur
+    var needsCsA=targetH===0; // CS ext si 0 but domicile
+    var needsBtts=targetH>0&&targetA>0;
+    var needsV1=targetH>targetA;
+    var needsX=targetH===targetA;
+    var needsV2=targetH<targetA;
+    var totalButs=targetH+targetA;
+
+    if(needsCsH&&pred.csH!=null)  {modelScore=modelScore!=null?modelScore*0.6+pred.csH*0.4:pred.csH;}
+    if(needsCsA&&pred.csA!=null)  {modelScore=modelScore!=null?modelScore*0.6+pred.csA*0.4:pred.csA;}
+    if(!needsBtts&&pred.bttsNon!=null){var bv=pred.bttsNon*0.7;modelScore=modelScore!=null?modelScore*0.65+bv*0.35:bv;}
+    if(needsBtts&&pred.btts!=null){var bv2=pred.btts*0.5;modelScore=modelScore!=null?modelScore*0.65+bv2*0.35:bv2;}
     if(pred.hmsc!=null&&pred.amsc!=null){
-      var m2=(1-pred.hmsc)*(1-pred.amsc);
-      modelScore=modelScore!=null?(modelScore*0.55+m2*0.45):m2;
+      var m2=needsBtts?(pred.hmsc*pred.amsc):((1-pred.hmsc)*(1-pred.amsc));
+      modelScore=modelScore!=null?modelScore*0.55+m2*0.45:m2;
     }
-    if(pred.bttsNon!=null){
-      var bts=pred.bttsNon*pred.bttsNon*0.45;
-      if(modelScore!=null) modelScore=modelScore*0.70+bts*0.30; else modelScore=bts;
+    if(needsV1&&pred.v1!=null)    modelScore=modelScore!=null?modelScore*(0.8+pred.v1*0.4):null;
+    if(needsX&&pred.x!=null)      modelScore=modelScore!=null?modelScore*(0.8+pred.x*0.5):null;
+    if(needsV2&&pred.v2!=null)    modelScore=modelScore!=null?modelScore*(0.8+pred.v2*0.4):null;
+    // Ajustement total buts
+    if(totalButs===0&&pred.under!=null&&modelScore!=null) modelScore*=(0.8+pred.under*0.4);
+    if(totalButs===1&&pred.under!=null&&modelScore!=null) modelScore*=(0.7+pred.under*0.5);
+    if(modelScore!=null) modelScore=Math.min(0.60,Math.max(0.002,modelScore));
+
+    // ── Calibration passive via corrélations stockées ──
+    if(corrData&&corrData.corr){
+      var corrBoost=1.0;var nCorr=0;
+      var mktMap={v1:pred.v1,x:pred.x,v2:pred.v2,btts:pred.btts,bttsNon:pred.bttsNon,
+                  csH:pred.csH,csA:pred.csA,hmsc:pred.hmsc,amsc:pred.amsc,
+                  plus:pred.plus,under:pred.under,dc1x:pred.dc1x,dcx2:pred.dcx2,dc12:pred.dc12};
+      Object.keys(corrData.corr).forEach(function(k){
+        var predVal=mktMap[k];
+        if(predVal==null||predVal<0.5)return; // marché non prédit
+        var corrRate=corrData.corr[k]; // taux historique observé
+        var baseR=corrData.baseRate||0.05;
+        if(baseR>0){
+          // Ratio : combien fois plus probable que la base quand ce marché prédit
+          var ratio=corrRate/baseR;
+          // Limiter l'impact : max ×2, min ×0.5
+          corrBoost*=Math.min(2.0,Math.max(0.5,Math.pow(ratio,0.4)));
+          nCorr++;
+        }
+      });
+      if(nCorr>0&&modelScore!=null){
+        modelScore=Math.min(0.65,Math.max(0.002,modelScore*corrBoost));
+      }
     }
-    if(pred.under!=null&&modelScore!=null)  modelScore*=(0.80+pred.under*0.40);
-    if(pred.x!=null&&modelScore!=null)      modelScore*=(0.80+pred.x*0.60);
-    if(modelScore!=null) modelScore=Math.min(0.55,Math.max(0.005,modelScore));
   }
+
   if(!all||all.length<5)
-    return Math.min(99,Math.max(1,Math.round((modelScore!=null?modelScore:0.08)*100)));
-  var total=all.length, nb00=all.filter(function(x){return x.h===0&&x.a===0}).length;
-  var baseRate=nb00/total;
+    return Math.min(99,Math.max(1,Math.round((modelScore!=null?modelScore:0.05)*100)));
+
+  // ── Score statistique (historique ligue/heure/jour) ──
+  var total=all.length;
+  var nbTarget=all.filter(function(x){return x.h===targetH&&x.a===targetA}).length;
+  var baseRate=nbTarget/total;
   var ligMs=all.filter(function(x){return x.league===m.league});
-  var ligRate=ligMs.length>=5?(ligMs.filter(function(x){return x.h===0&&x.a===0}).length/ligMs.length):baseRate;
+  var ligRate=ligMs.length>=5?(ligMs.filter(function(x){return x.h===targetH&&x.a===targetA}).length/ligMs.length):baseRate;
   var hour=m.heure?(parseInt(m.heure.split(':')[0])||null):null;
   var hourMs=hour!=null?all.filter(function(x){return x.heure&&parseInt(x.heure.split(':')[0])===hour}):[];
-  var hourRate=hourMs.length>=5?(hourMs.filter(function(x){return x.h===0&&x.a===0}).length/hourMs.length):baseRate;
+  var hourRate=hourMs.length>=5?(hourMs.filter(function(x){return x.h===targetH&&x.a===targetA}).length/hourMs.length):baseRate;
   var dayRate=baseRate;
   var matchDate=m.date||(typeof selDate!=='undefined'?selDate:null);
   if(matchDate){
     var dow=new Date(matchDate).getDay();
     var dayMs=all.filter(function(x){return x.date&&new Date(x.date).getDay()===dow});
-    if(dayMs.length>=5) dayRate=dayMs.filter(function(x){return x.h===0&&x.a===0}).length/dayMs.length;
+    if(dayMs.length>=5) dayRate=dayMs.filter(function(x){return x.h===targetH&&x.a===targetA}).length/dayMs.length;
   }
   var statScore=ligRate*0.35+hourRate*0.30+dayRate*0.20+baseRate*0.15;
-  var finalScore=modelScore!=null?(statScore*0.50+modelScore*0.50):statScore;
+  var finalScore=modelScore!=null?(statScore*0.45+modelScore*0.55):statScore;
   return Math.min(99,Math.max(1,Math.round(finalScore*100)));
 }
 
-function calc00(){
+// Wrapper 0-0 pour rétrocompatibilité
+function compute00Badge(m,pred){return computeScoreBadge(0,0,m,pred);}
+
+function calc00(){calcScore(0,0);}
+
+function calcScore(targetH, targetA){
+  var label=targetH+'-'+targetA;
   var all=get00Stats();
   if(all.length<5){showAl('al00','er','Pas assez de matchs en base (minimum 5). Lance d\'abord une collecte.');return}
+
   var total=all.length;
-  var ms00=all.filter(function(m){return m.h===0&&m.a===0});
-  var n00=ms00.length;
-  var rate=n00/total;
+  var msTarget=all.filter(function(m){return m.h===targetH&&m.a===targetA});
+  var nTarget=msTarget.length;
+  var rate=nTarget/total;
+  var pct=Math.round(rate*100);
+
+  // Couleur selon score
+  var scoreCol=targetH===0&&targetA===0?'var(--p)':targetH>targetA?'var(--g)':targetH<targetA?'var(--b)':'var(--y)';
+  var scoreIcon=targetH===0&&targetA===0?'🔒':targetH===targetA?'🤝':targetH>targetA?'🏠':'✈️';
 
   // ─── Par ligue ───
   var ligMap={};
   all.forEach(function(m){
-    var k=m.league||'?';
-    if(!ligMap[k])ligMap[k]={total:0,n00:0};
+    var k=(m.country?m.country+' · ':'')+( m.league||'?');
+    if(!ligMap[k])ligMap[k]={total:0,n:0};
     ligMap[k].total++;
-    if(m.h===0&&m.a===0)ligMap[k].n00++;
+    if(m.h===targetH&&m.a===targetA)ligMap[k].n++;
   });
-  var ligArr=Object.keys(ligMap).map(function(k){return{name:k,total:ligMap[k].total,n00:ligMap[k].n00,rate:ligMap[k].n00/ligMap[k].total}}).filter(function(x){return x.total>=5}).sort(function(a,b){return b.rate-a.rate});
+  var ligArr=Object.keys(ligMap).map(function(k){
+    return{name:k,total:ligMap[k].total,n:ligMap[k].n,rate:ligMap[k].n/ligMap[k].total};
+  }).filter(function(x){return x.total>=5}).sort(function(a,b){return b.rate-a.rate});
+
+  // ─── Nb matchs par ligue (volume) ───
+  var ligVolume=Object.keys(ligMap).map(function(k){
+    return{name:k,total:ligMap[k].total,n:ligMap[k].n};
+  }).filter(function(x){return x.total>=3}).sort(function(a,b){return b.total-a.total});
 
   // ─── Par heure ───
   var hourMap={};
   all.forEach(function(m){
     var h=m.heure?m.heure.split(':')[0]:'?';
-    if(!hourMap[h])hourMap[h]={total:0,n00:0};
+    if(!hourMap[h])hourMap[h]={total:0,n:0};
     hourMap[h].total++;
-    if(m.h===0&&m.a===0)hourMap[h].n00++;
+    if(m.h===targetH&&m.a===targetA)hourMap[h].n++;
   });
-  var hourArr=Object.keys(hourMap).map(function(h){return{h:h,total:hourMap[h].total,n00:hourMap[h].n00,rate:hourMap[h].n00/hourMap[h].total}}).filter(function(x){return x.total>=3}).sort(function(a,b){return b.rate-a.rate});
+  var hourArr=Object.keys(hourMap).map(function(h){
+    return{h:h,total:hourMap[h].total,n:hourMap[h].n,rate:hourMap[h].n/hourMap[h].total};
+  }).filter(function(x){return x.total>=3}).sort(function(a,b){return b.rate-a.rate});
 
   // ─── Par jour ───
   var DAYS=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
@@ -5402,195 +5930,269 @@ function calc00(){
   all.forEach(function(m){
     if(!m.date)return;
     var d=new Date(m.date).getDay();var k=DAYS[d]||'?';
-    if(!dayMap[k])dayMap[k]={total:0,n00:0};
+    if(!dayMap[k])dayMap[k]={total:0,n:0};
     dayMap[k].total++;
-    if(m.h===0&&m.a===0)dayMap[k].n00++;
+    if(m.h===targetH&&m.a===targetA)dayMap[k].n++;
   });
-  var dayArr=DAYS.map(function(d){var e=dayMap[d]||{total:0,n00:0};return{d:d,total:e.total,n00:e.n00,rate:e.total>0?e.n00/e.total:0}}).filter(function(x){return x.total>0});
+  var dayArr=DAYS.map(function(d){
+    var e=dayMap[d]||{total:0,n:0};
+    return{d:d,total:e.total,n:e.n,rate:e.total>0?e.n/e.total:0};
+  }).filter(function(x){return x.total>0});
 
   // ─── Équipes ───
   var teamH={},teamA={};
   all.forEach(function(m){
     var h=m.home||'?',a=m.away||'?';
-    if(!teamH[h])teamH[h]={total:0,n00:0};teamH[h].total++;if(m.h===0&&m.a===0)teamH[h].n00++;
-    if(!teamA[a])teamA[a]={total:0,n00:0};teamA[a].total++;if(m.h===0&&m.a===0)teamA[a].n00++;
+    if(!teamH[h])teamH[h]={total:0,n:0};teamH[h].total++;if(m.h===targetH&&m.a===targetA)teamH[h].n++;
+    if(!teamA[a])teamA[a]={total:0,n:0};teamA[a].total++;if(m.h===targetH&&m.a===targetA)teamA[a].n++;
   });
-  var topH=Object.keys(teamH).filter(function(k){return teamH[k].total>=3}).map(function(k){return{name:k,total:teamH[k].total,n00:teamH[k].n00,rate:teamH[k].n00/teamH[k].total}}).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
-  var topA=Object.keys(teamA).filter(function(k){return teamA[k].total>=3}).map(function(k){return{name:k,total:teamA[k].total,n00:teamA[k].n00,rate:teamA[k].n00/teamA[k].total}}).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
+  var topH=Object.keys(teamH).filter(function(k){return teamH[k].total>=3}).map(function(k){
+    return{name:k,total:teamH[k].total,n:teamH[k].n,rate:teamH[k].n/teamH[k].total};
+  }).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
+  var topA=Object.keys(teamA).filter(function(k){return teamA[k].total>=3}).map(function(k){
+    return{name:k,total:teamA[k].total,n:teamA[k].n,rate:teamA[k].n/teamA[k].total};
+  }).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
 
   // ─── H2H ───
   var h2hMap={};
   all.forEach(function(m){
     var k=[m.home,m.away].sort().join(' vs ');
-    if(!h2hMap[k])h2hMap[k]={total:0,n00:0};h2hMap[k].total++;if(m.h===0&&m.a===0)h2hMap[k].n00++;
+    if(!h2hMap[k])h2hMap[k]={total:0,n:0};h2hMap[k].total++;
+    if(m.h===targetH&&m.a===targetA)h2hMap[k].n++;
   });
-  var topH2H=Object.keys(h2hMap).filter(function(k){return h2hMap[k].total>=2&&h2hMap[k].n00>0}).map(function(k){return{name:k,total:h2hMap[k].total,n00:h2hMap[k].n00,rate:h2hMap[k].n00/h2hMap[k].total}}).sort(function(a,b){return b.n00-a.n00||b.rate-a.rate}).slice(0,8);
+  var topH2H=Object.keys(h2hMap).filter(function(k){return h2hMap[k].total>=2&&h2hMap[k].n>0}).map(function(k){
+    return{name:k,total:h2hMap[k].total,n:h2hMap[k].n,rate:h2hMap[k].n/h2hMap[k].total};
+  }).sort(function(a,b){return b.n-a.n||b.rate-a.rate}).slice(0,8);
 
-  // ─── Corrélations avec marchés (sur les matchs trackés) ───
+  // ─── Distribution des scores dans la même catégorie (total buts identique) ───
+  var sameTotalButs=targetH+targetA;
+  var sameTotal=all.filter(function(m){return (m.h+m.a)===sameTotalButs});
+  var scoreDistrib={};
+  sameTotal.forEach(function(m){
+    var k=m.h+'-'+m.a;
+    if(!scoreDistrib[k])scoreDistrib[k]=0;
+    scoreDistrib[k]++;
+  });
+  var distribArr=Object.keys(scoreDistrib).map(function(k){
+    return{score:k,n:scoreDistrib[k],pct:Math.round(scoreDistrib[k]/sameTotal.length*100)};
+  }).sort(function(a,b){return b.n-a.n});
+
+  // ─── Corrélations avec marchés (tracking) ───
   var track=getTrackCompat();
+  var MKTS=['plus','under','btts','bttsNon','v1','x','v2','csH','csA','hmsc','amsc','dc1x','dcx2','dc12'];
+  var MLBLS={plus:'Over +seuil',under:'Under -seuil',btts:'BTTS Oui',bttsNon:'BTTS Non',
+    v1:'Victoire Dom',x:'Match Nul',v2:'Victoire Ext',
+    csH:'CS Dom (0 encaissé)',csA:'CS Ext (0 encaissé)',
+    hmsc:'Dom marque',amsc:'Ext marque',
+    dc1x:'DC 1X',dcx2:'DC X2',dc12:'DC 12'};
   var mktCorr={};
-  var MKTS=['plus','under','btts','bttsNon','v1','x','v2','csH','csA'];
-  var MLBLS={plus:'Over +seuil',under:'Under -seuil',btts:'BTTS Oui',bttsNon:'BTTS Non',v1:'Victoire Dom',x:'Match Nul',v2:'Victoire Ext',csH:'CS Dom',csA:'CS Ext'};
-  MKTS.forEach(function(k){mktCorr[k]={both:0,only00:0,onlyMkt:0,neither:0}});
+  MKTS.forEach(function(k){mktCorr[k]={withTarget:0,total:0}});
   track.forEach(function(t){
-    if(t.h===undefined||t.a===undefined)return;
-    var is00=t.h===0&&t.a===0;
+    if(t.rH===undefined||t.rA===undefined)return;
+    var isTarget=t.rH===targetH&&t.rA===targetA;
     MKTS.forEach(function(k){
-      var pred=t.pred&&t.pred[k]!==undefined?t.pred[k]:null;
-      if(pred===null)return;
-      var mktPred=pred>=0.5;
-      if(is00&&mktPred)mktCorr[k].both++;
-      else if(is00&&!mktPred)mktCorr[k].only00++;
-      else if(!is00&&mktPred)mktCorr[k].onlyMkt++;
-      else mktCorr[k].neither++;
+      var pKey='p'+k.charAt(0).toUpperCase()+k.slice(1);
+      // Map to actual tracking keys
+      var pmap={plus:'pPlus',under:'pUnder',btts:'pBtts',bttsNon:'pBttsNon',
+        v1:'pV1',x:'pX',v2:'pV2',csH:'pCsH',csA:'pCsA',
+        hmsc:'pHmsc',amsc:'pAmsc',dc1x:'pDc1x',dcx2:'pDcx2',dc12:'pDc12'};
+      var val=t[pmap[k]];
+      if(val===null||val===undefined)return;
+      if(val>=50){mktCorr[k].total++;if(isTarget)mktCorr[k].withTarget++;}
     });
   });
+  // Tri par taux de corrélation
+  var corrArr=MKTS.map(function(k){
+    var c=mktCorr[k];if(c.total<3)return null;
+    return{k:k,label:MLBLS[k],total:c.total,n:c.withTarget,rate:Math.round(c.withTarget/c.total*100)};
+  }).filter(Boolean).sort(function(a,b){return b.rate-a.rate});
 
-  // ─── Tranches de prédiction 0-0 ───
-  // Pour chaque entrée trackée, calculer la pred 0-0 et voir si le 0-0 s'est produit
-  var pred00Tranches=[
-    {lbl:'<15%',min:0,max:14,n:0,ok:0},
-    {lbl:'15–20%',min:15,max:20,n:0,ok:0},
-    {lbl:'20–25%',min:20,max:25,n:0,ok:0},
-    {lbl:'25–30%',min:25,max:30,n:0,ok:0},
-    {lbl:'30–40%',min:30,max:40,n:0,ok:0},
-    {lbl:'40%+',min:40,max:100,n:0,ok:0},
-  ];
-  var cache=buildCache();
-  if(cache.total>0){
-    track.forEach(function(t){
-      if(t.rH===undefined||t.rH===null||t.rA===null)return;
-      // Reconstruire le match depuis le tracking (rH/rA sont les vrais scores)
-      var fakeM={league:t.league||'?',country:t.country||'',heure:t.heure||'??',
-                 home:t.home||'?',away:t.away||'?',id:t.id};
-      // Reconstruire pred depuis les champs pXxx du tracking
-      var fakePred=t.pPlus!==null?{
-        plus:t.pPlus/100,under:t.pUnder/100,btts:t.pBtts/100,bttsNon:t.pBttsNon/100,
-        v1:t.pV1/100,x:t.pX/100,v2:t.pV2/100,csH:t.pCsH/100,csA:t.pCsA/100,
-        hmsc:t.pHmsc/100,amsc:t.pAmsc/100,conf:t.pConf||0
-      }:null;
-      var p00=compute00Badge(fakeM,fakePred);
-      if(p00===null)return;
-      var is00=t.rH===0&&t.rA===0;
-      pred00Tranches.forEach(function(tr){
-        if(p00>=tr.min&&p00<=tr.max){tr.n++;if(is00)tr.ok++;}
-      });
-    });
-  }
+  // ─── Analyse comparative : quand ce score arrive, quels autres marchés aussi vrai ───
+  var coScores={};
+  msTarget.forEach(function(m){
+    // Compter les patterns dans les matchs terminés avec ce score
+    var tot=m.h+m.a;
+    var k='total_'+tot;if(!coScores[k])coScores[k]=0;coScores[k]++;
+    if(m.h>0&&m.a>0){if(!coScores.btts)coScores.btts=0;coScores.btts++;}
+    if(m.h>m.a){if(!coScores.v1)coScores.v1=0;coScores.v1++;}
+    if(m.h<m.a){if(!coScores.v2)coScores.v2=0;coScores.v2++;}
+    if(m.h===m.a){if(!coScores.nul)coScores.nul=0;coScores.nul++;}
+    if(m.a===0){if(!coScores.csH)coScores.csH=0;coScores.csH++;}
+    if(m.h===0){if(!coScores.csA)coScores.csA=0;coScores.csA++;}
+  });
 
   // ─── RENDER ───
-  var pct=Math.round(rate*100);
   var html='<div class="card">';
-  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">';
-  html+='<div class="sb"><div class="sv" style="color:var(--p);font-size:2rem">'+pct+'%</div><div class="sl">Taux global 0-0</div></div>';
-  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+n00+'</div><div class="sl">Matchs 0-0</div></div>';
+  // Header
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">';
+  html+='<div style="font-size:2.5rem;font-weight:900;color:'+scoreCol+'">'+scoreIcon+' '+label+'</div>';
+  html+='<div>';
+  html+='<div style="font-size:1.8rem;font-weight:900;color:'+scoreCol+'">'+pct+'%</div>';
+  html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono)">taux global · '+nTarget+'/'+total+' matchs</div>';
+  html+='</div></div>';
+
+  // Stats globales
+  html+='<div class="sg g3" style="margin-bottom:14px">';
+  html+='<div class="sb"><div class="sv" style="color:'+scoreCol+';font-size:1.8rem">'+pct+'%</div><div class="sl">Taux global</div></div>';
+  html+='<div class="sb"><div class="sv" style="color:var(--g)">'+nTarget+'</div><div class="sl">Occurrences</div></div>';
   html+='<div class="sb"><div class="sv" style="color:var(--dm)">'+total+'</div><div class="sl">Total matchs</div></div>';
   html+='</div>';
 
-  // Ligue
-  if(ligArr.length){
-    html+='<div class="st" style="margin-bottom:8px">Par ligue</div>';
+  // Profil du score (marchés liés)
+  if(nTarget>0){
+    html+='<div class="st" style="margin-bottom:8px">Profil du score '+label+'</div>';
+    html+='<div class="sg g3" style="margin-bottom:12px">';
+    var pV1=nTarget>0?Math.round((coScores.v1||0)/nTarget*100):0;
+    var pNul=nTarget>0?Math.round((coScores.nul||0)/nTarget*100):0;
+    var pV2=nTarget>0?Math.round((coScores.v2||0)/nTarget*100):0;
+    var pBtts=nTarget>0?Math.round((coScores.btts||0)/nTarget*100):0;
+    var pCsH=nTarget>0?Math.round((coScores.csH||0)/nTarget*100):0;
+    var pCsA=nTarget>0?Math.round((coScores.csA||0)/nTarget*100):0;
+    if(pV1>0)html+='<div class="sb"><div class="sv" style="color:var(--g)">'+pV1+'%</div><div class="sl">V1 Dom</div></div>';
+    if(pNul>0)html+='<div class="sb"><div class="sv" style="color:var(--y)">'+pNul+'%</div><div class="sl">Nul</div></div>';
+    if(pV2>0)html+='<div class="sb"><div class="sv" style="color:var(--b)">'+pV2+'%</div><div class="sl">V2 Ext</div></div>';
+    if(pBtts>0)html+='<div class="sb"><div class="sv">'+pBtts+'%</div><div class="sl">BTTS</div></div>';
+    if(pCsH>0)html+='<div class="sb"><div class="sv">'+pCsH+'%</div><div class="sl">CS Dom</div></div>';
+    if(pCsA>0)html+='<div class="sb"><div class="sv">'+pCsA+'%</div><div class="sl">CS Ext</div></div>';
+    html+='</div>';
+  }
+
+  // Distribution meme total de buts
+  if(sameTotal.length>0&&sameTotalButs>0){
+    html+='<div class="st" style="margin-bottom:6px">Distribution scores à '+sameTotalButs+' but(s)</div>';
     html+='<div class="bars">';
-    ligArr.slice(0,10).forEach(function(l){
-      var p=Math.round(l.rate*100);var col=p>=15?'var(--p)':p>=8?'var(--y)':'var(--dm)';
-      html+='<div class="br2"><div class="bn">'+l.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:'+col+'">'+p+'% ('+l.n00+'/'+l.total+')</div></div></div>';
+    distribArr.forEach(function(d){
+      var isTarget=(d.score===label);
+      html+='<div class="br2"><div class="bn" style="color:'+(isTarget?scoreCol:'var(--tx)');html+='">'+d.score+'</div>';
+      html+='<div class="bb2"><div class="bf" style="width:'+d.pct+'%;background:'+(isTarget?scoreCol:'var(--bd2)')+'">'+d.pct+'% ('+d.n+')</div></div></div>';
     });
     html+='</div>';
   }
 
-  // Heure
+  // Par ligue (taux)
+  if(ligArr.length){
+    html+='<div class="st" style="margin:12px 0 8px">Par ligue — taux '+label+'</div>';
+    html+='<div class="bars">';
+    ligArr.slice(0,12).forEach(function(l){
+      var p=Math.round(l.rate*100);
+      html+='<div class="br2"><div class="bn">'+l.name.substring(0,20)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*5)+'%;background:'+scoreCol+'">'+p+'% ('+l.n+'/'+l.total+')</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Par ligue (volume)
+  if(ligVolume.length){
+    html+='<div class="st" style="margin:12px 0 8px">Ligues avec le plus de matchs en base</div>';
+    var maxVol=ligVolume[0].total;
+    html+='<div class="bars">';
+    ligVolume.slice(0,10).forEach(function(l){
+      html+='<div class="br2"><div class="bn">'+l.name.substring(0,20)+'</div><div class="bb2"><div class="bf" style="width:'+Math.round(l.total/maxVol*100)+'%;background:var(--dm)">'+l.total+' matchs ('+l.n+' × '+label+')</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Par heure
   if(hourArr.length){
     html+='<div class="st" style="margin:12px 0 8px">Par heure de coup d\'envoi</div>';
     html+='<div class="bars">';
     hourArr.forEach(function(h){
-      var p=Math.round(h.rate*100);var col=p>=15?'var(--p)':p>=8?'var(--y)':'var(--dm)';
-      html+='<div class="br2"><div class="bn" style="width:40px">'+h.h+'h</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:'+col+'">'+p+'% ('+h.n00+'/'+h.total+')</div></div></div>';
+      var p=Math.round(h.rate*100);
+      html+='<div class="br2"><div class="bn" style="width:36px">'+h.h+'h</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*5)+'%;background:'+scoreCol+'">'+p+'% ('+h.n+'/'+h.total+')</div></div></div>';
     });
     html+='</div>';
   }
 
-  // Jour
+  // Par jour
   if(dayArr.length){
     html+='<div class="st" style="margin:12px 0 8px">Par jour de la semaine</div>';
     html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
     dayArr.forEach(function(d){
-      var p=Math.round(d.rate*100);var col=p>=15?'var(--p)':p>=8?'var(--y)':'var(--dm)';
-      html+='<div style="text-align:center;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 4px"><div style="font-size:1rem;font-weight:900;color:'+col+'">'+p+'%</div><div style="font-size:.52rem;color:var(--dm);font-family:var(--mono)">'+d.d+'</div><div style="font-size:.5rem;color:var(--dm)">'+d.n00+'/'+d.total+'</div></div>';
+      var p=Math.round(d.rate*100);
+      html+='<div style="text-align:center;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 4px">';
+      html+='<div style="font-size:.9rem;font-weight:900;color:'+scoreCol+'">'+p+'%</div>';
+      html+='<div style="font-size:.52rem;color:var(--dm);font-family:var(--mono)">'+d.d+'</div>';
+      html+='<div style="font-size:.5rem;color:var(--dm)">'+d.n+'/'+d.total+'</div></div>';
     });
     html+='</div>';
   }
 
-  // Équipes domicile
+  // Équipes dom
   if(topH.length){
-    html+='<div class="st" style="margin:12px 0 8px">Top équipes 0-0 à domicile</div>';
+    html+='<div class="st" style="margin:12px 0 8px">Top équipes à domicile ('+label+')</div>';
     html+='<div class="bars">';
     topH.forEach(function(t){
       var p=Math.round(t.rate*100);
-      html+='<div class="br2"><div class="bn">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--p)">'+p+'% ('+t.n00+'/'+t.total+')</div></div></div>';
+      html+='<div class="br2"><div class="bn">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:'+scoreCol+'">'+p+'% ('+t.n+'/'+t.total+')</div></div></div>';
     });
     html+='</div>';
   }
 
-  // Équipes extérieur
+  // Équipes ext
   if(topA.length){
-    html+='<div class="st" style="margin:12px 0 8px">Top équipes 0-0 à l\'ext&#xe9;rieur</div>';
+    html+='<div class="st" style="margin:12px 0 8px">Top équipes à l\'extérieur ('+label+')</div>';
     html+='<div class="bars">';
     topA.forEach(function(t){
       var p=Math.round(t.rate*100);
-      html+='<div class="br2"><div class="bn">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--teal)">'+p+'% ('+t.n00+'/'+t.total+')</div></div></div>';
+      html+='<div class="br2"><div class="bn">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:var(--teal)">'+p+'% ('+t.n+'/'+t.total+')</div></div></div>';
     });
     html+='</div>';
   }
 
   // H2H
   if(topH2H.length){
-    html+='<div class="st" style="margin:12px 0 8px">Paires H2H avec le plus de 0-0</div>';
+    html+='<div class="st" style="margin:12px 0 8px">Paires H2H — score '+label+' récurrent</div>';
     html+='<div class="bars">';
     topH2H.forEach(function(t){
       var p=Math.round(t.rate*100);
-      html+='<div class="br2"><div class="bn" style="width:130px">'+t.name.substring(0,20)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*3)+'%;background:var(--y)">'+t.n00+' 0-0 / '+t.total+' ('+p+'%)</div></div></div>';
+      html+='<div class="br2"><div class="bn" style="width:120px">'+t.name.substring(0,18)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:var(--y)">'+t.n+'× ('+p+'%)</div></div></div>';
     });
     html+='</div>';
   }
 
-  // ─── Tranches prédiction 0-0 ───
-  var validTranches=pred00Tranches.filter(function(t){return t.n>=2;});
-  if(validTranches.length){
-    html+='<div class="st" style="margin:12px 0 8px">&#x1F4CA; Tranches de prédiction 0-0</div>';
-    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px;line-height:1.5">Quand FootStats prédit X% de 0-0, est-ce que ça se réalise ? La tranche avec le meilleur taux réel = signal le plus fiable.</div>';
-    html+='<div class="tbl"><table><thead><tr><th>Tranche pred</th><th>Matchs</th><th>0-0 réels</th><th>Taux réel</th><th>Fiabilité</th></tr></thead><tbody>';
-    var bestTranche=null,bestRate=0;
-    validTranches.forEach(function(tr){
-      var rate00=Math.round(tr.ok/tr.n*100);
-      var col=rate00>=25?'tg':rate00>=15?'ty':'';
-      var fiab=tr.n>=10?'★★★':tr.n>=5?'★★':'★';
-      html+='<tr><td style="font-weight:700">'+tr.lbl+'</td><td>'+tr.n+'</td><td>'+tr.ok+'</td><td class="'+col+'">'+rate00+'%</td><td style="color:var(--y)">'+fiab+'</td></tr>';
-      if(rate00>bestRate&&tr.n>=3){bestRate=rate00;bestTranche=tr;}
+  // Corrélations marchés
+  if(corrArr.length){
+    html+='<div class="st" style="margin:12px 0 8px">Corrélations marchés → score '+label+'</div>';
+    html+='<div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-bottom:7px">Quand le marché était prédit ≥50%, combien de fois le score '+label+' s\'est produit ?</div>';
+    html+='<div class="tbl"><table><thead><tr><th>Marché prédit</th><th>Matchs</th><th>Score '+label+'</th><th>Taux</th><th>Signal</th></tr></thead><tbody>';
+    corrArr.forEach(function(c){
+      var signalCol=c.rate>=25?'tg':c.rate>=12?'ty':'';
+      var signal=c.rate>=25?'🔥 Fort':c.rate>=12?'⚡ Moyen':'—';
+      html+='<tr><td>'+c.label+'</td><td>'+c.total+'</td><td>'+c.n+'</td><td class="'+signalCol+'">'+c.rate+'%</td><td>'+signal+'</td></tr>';
     });
     html+='</tbody></table></div>';
-    if(bestTranche){
-      html+='<div style="margin-top:8px;padding:8px;background:rgba(176,107,255,.08);border:1px solid rgba(176,107,255,.3);border-radius:7px;font-size:.68rem;font-family:var(--mono)">&#x1F3AF; Meilleure tranche : <strong style="color:var(--p)">'+bestTranche.lbl+'</strong> → 0-0 réel '+bestRate+'% des fois ('+bestTranche.n+' matchs)</div>';
-    }
   }
 
-  // Corrélations marchés
-  if(track.length>=5){
-    html+='<div class="st" style="margin:12px 0 8px">Corrélations marchés → 0-0</div>';
-    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-bottom:8px">Sur '+track.length+' matchs trackés — quand le marché était prédit, combien se sont terminés 0-0 ?</div>';
-    html+='<div class="tbl"><table><thead><tr><th>Marché prédit</th><th>Matchs</th><th>0-0 dedans</th><th>Taux</th></tr></thead><tbody>';
-    MKTS.forEach(function(k){
-      var c=mktCorr[k];var tot=c.both+c.onlyMkt;if(tot<3)return;
-      var p=Math.round(c.both/tot*100);var col=p>=20?'tg':p>=10?'ty':'';
-      html+='<tr><td>'+MLBLS[k]+'</td><td>'+tot+'</td><td>'+c.both+'</td><td class="'+col+'">'+p+'%</td></tr>';
-    });
-    html+='</tbody></table></div>';
-    html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);margin-top:6px;line-height:1.6">&#x1F4A1; Un taux &gt;20% signifie que quand ce march&#xe9; est pr&#xe9;dit, le 0-0 arrive souvent &#x2192; signal fort.<br>Le march&#xe9; <strong style="color:var(--p)">BTTS Non + Under</strong> pr&#xe9;dit ensemble est le meilleur indicateur 0-0.</div>';
-  }
+  // Bouton sauvegarder corrélations pour calibration passive
+  html+='<div class="card" style="margin-top:10px;padding:11px;background:rgba(0,229,160,.04);border:1px solid rgba(0,229,160,.2)">';
+  html+='<div class="st" style="margin-top:0;margin-bottom:6px;color:var(--g)">🔧 Calibration passive</div>';
+  html+='<div style="font-size:.62rem;color:var(--dm);font-family:var(--mono);line-height:1.6;margin-bottom:8px">';
+  html+='Sauvegarde les taux de corrélation observés. L\'app les utilisera pour ajuster la probabilité du score '+label+' sur les prochains matchs.';
+  html+='</div>';
+  // Check if already saved
+  var existingCorr=getScoreCorr();
+  var alreadySaved=existingCorr[label]&&existingCorr[label].saved;
+  if(alreadySaved)html+='<div style="font-size:.6rem;color:var(--g);font-family:var(--mono);margin-bottom:6px">✅ Dernière calibration : '+existingCorr[label].saved+'</div>';
+  html+='<button class="btn bg" style="font-size:.73rem;padding:8px" onclick="doSaveScoreCorr('+targetH+','+targetA+')">💾 Sauvegarder les corrélations '+label+'</button>';
+  html+='</div>';
 
   html+='</div>';
   var out=document.getElementById('out00');
   out.innerHTML=html;out.style.display='block';
+  hideAl('al00');
+  // Stocker corrArr dans window pour accès depuis doSaveScoreCorr
+  window._lastCorrArr=corrArr;
+  window._lastCorrScore={h:targetH,a:targetA,baseRate:rate};
 }
+
+function doSaveScoreCorr(h,a){
+  if(!window._lastCorrArr||window._lastCorrScore.h!==h||window._lastCorrScore.a!==a){
+    alert('Lance d\'abord l\'analyse du score '+h+'-'+a);return;
+  }
+  saveScoreCorrData(h,a,window._lastCorrArr,window._lastCorrScore.baseRate);
+  var btn=event.target;btn.textContent='✅ Sauvegardé !';btn.style.background='var(--g)';
+  setTimeout(function(){calcScore(h,a);},800);
+}
+
 
 // ═══════════════════════════════════ BILAN SÉLECTION ═══
 function renderBilanSelection(entries,s){
@@ -5777,21 +6379,24 @@ function syncGlobal(){
 
   // Construire cache GLOBAL une seule fois (toutes les données historiques)
   var cache=buildCache();
-  var track=getTrack();
-  var trackIdSet=new Set(track.map(function(t){return t.id;}));
   var added=0,skipped=0,processed=0;
   var total=candidates.length;
+
+  // Charger le tracking depuis IDB avant de commencer
+  getTrackIDB().then(function(track){
+    var trackIdSet=new Set(track.map(function(t){return t.id;}));
 
   function processChunk(idx){
     if(!_syncRunning){
       finishSync(added,skipped,total,'Arrêté');return;
     }
     if(idx>=total){
-      // Sauvegarder le tracking mis à jour
-      setTrack(track);
-      // Auto-calibration
-      computeAndSaveCalib(track,seuilFiab);
-      finishSync(added,skipped,total,'Terminé');
+      // Sauvegarder dans IDB en arrière-plan
+      setTrackIDB(track).then(function(){
+        _trackCache=track; // mettre à jour le cache mémoire
+        computeAndSaveCalib(getTrackCompat(),seuilFiab);
+        finishSync(added,skipped,total,'Terminé');
+      });
       return;
     }
     // Traiter par lots de 10 pour ne pas bloquer l'UI
@@ -5832,6 +6437,7 @@ function syncGlobal(){
     setTimeout(function(){processChunk(end)},0);
   }
   processChunk(0);
+  }); // end getTrackIDB().then
 }
 function finishSync(added,skipped,total,status){
   _syncRunning=false;
@@ -5841,23 +6447,42 @@ function finishSync(added,skipped,total,status){
   document.getElementById('syncPct').textContent='100%';
   document.getElementById('syncFill').style.width='100%';
   document.getElementById('syncFill').style.background=added>0?'var(--g)':'var(--y)';
-  try{
+  // Lire depuis IDB pour afficher la fiabilité
+  getTrackIDB().then(function(rawTrack){
+    _trackCache=rawTrack;
     var track=getTrackCompat();
-    if(track.length){hideAl('fiabAl');computeAndSaveCalib(track,seuilFiab);renderFiabOut();}
-  }catch(e){showAl('fiabAl','in','Sync terminée — '+added+' entrées ajoutées');}
+    if(track.length){
+      hideAl('fiabAl');
+      try{computeAndSaveCalib(track,seuilFiab);}catch(e){console.warn('calib err',e);}
+      try{renderFiabOut();}catch(e){showAl('fiabAl','er','Erreur rendu: '+e.message);}
+    } else {
+      showAl('fiabAl','in','Sync terminée — '+added+' ajoutés. Clique sur "Analyser la fiabilité".');
+    }
+  });
 }
 
 function calcFiabilite(){
-  var track=getTrackCompat();
-  if(!track.length){showAl('fiabAl','er','Aucune donnée — Lance d\'abord la Synchronisation globale ou charge des matchs terminés');return}
-  hideAl('fiabAl');
-  try{computeAndSaveCalib(track,seuilFiab);renderFiabOut();}
-  catch(e){showAl('fiabAl','er','Erreur analyse: '+e.message);}
+  showAl('fiabAl','in','Chargement...');
+  getTrackIDB().then(function(rawTrack){
+    _trackCache=rawTrack;
+    var track=getTrackCompat();
+    if(!track.length){showAl('fiabAl','er','Aucune donnée — Lance d\'abord la Synchronisation globale');return;}
+    hideAl('fiabAl');
+    try{computeAndSaveCalib(track,seuilFiab);}catch(e){console.warn('calib err',e);}
+    try{renderFiabOut();}
+    catch(e){showAl('fiabAl','er','Erreur analyse: '+e.message);}
+  });
 }
 function renderFiabOut(){
   try{
   ensureScoresTab();
-  var entries=getTrackCompat(),s=seuilFiab;if(!entries.length)return;
+  var entries=getTrackCompat(),s=seuilFiab;
+  if(!entries.length){
+    var out2=document.getElementById('fiabOut');
+    out2.style.display='block';
+    out2.innerHTML='<div class="al on ain" style="margin-top:8px">Aucune donnée — Lance d\'abord la <strong>Synchronisation globale</strong> puis clique sur <strong>Analyser la fiabilité</strong>.</div>';
+    return;
+  }
   var newCalib=getCalib(),calibApplied=Object.keys(newCalib).length>0;
   var gc=buildFiabGlobalCache(entries,s);
   window._calibData=gc.calibData;window._calibFact=newCalib;window._convData=gc.convData;
@@ -5865,7 +6490,7 @@ function renderFiabOut(){
   var savedTk=getTickets(),tkWon=savedTk.filter(function(t){return t.result==='won'}).length;
   var tkLost=savedTk.filter(function(t){return t.result==='lost'}).length,tkTotal=tkWon+tkLost;
   var html='';
-  html+='<div class="fiab-tabs"><button class="fiab-tab'+(fiabView==='resume'?' on':'')+'" data-v="resume" onclick="setFiabView(\'resume\')">Résumé</button><button class="fiab-tab'+(fiabView==='marches'?' on':'')+'" data-v="marches" onclick="setFiabView(\'marches\')">Marchés</button><button class="fiab-tab'+(fiabView==='analyse'?' on':'')+'" data-v="analyse" onclick="setFiabView(\'analyse\')">Analyse</button><button class="fiab-tab'+(fiabView==='roi'?' on':'')+'" data-v="roi" onclick="setFiabView(\'roi\')">ROI</button><button class="fiab-tab'+(fiabView==='tranches'?' on':'')+'" data-v="tranches" onclick="setFiabView(\'tranches\')">Tranches</button><button class="fiab-tab'+(fiabView==='scores'?' on':'')+'" data-v="scores" onclick="setFiabView(\'scores\')">Scores</button><button class="fiab-tab'+(fiabView==='selection'?' on':'')+'" data-v="selection" onclick="setFiabView(\'selection\')">Sélection</button><button class="fiab-tab'+(fiabView==='zeroo'?' on':'')+'" data-v="zeroo" onclick="setFiabView(\'zeroo\')" style="color:var(--p)">&#x1F512; 0-0</button></div>';
+  html+='<div class="fiab-tabs"><button class="fiab-tab'+(fiabView==='resume'?' on':'')+'" data-v="resume" onclick="setFiabView(\'resume\')">Résumé</button><button class="fiab-tab'+(fiabView==='marches'?' on':'')+'" data-v="marches" onclick="setFiabView(\'marches\')">Marchés</button><button class="fiab-tab'+(fiabView==='analyse'?' on':'')+'" data-v="analyse" onclick="setFiabView(\'analyse\')">Analyse</button><button class="fiab-tab'+(fiabView==='roi'?' on':'')+'" data-v="roi" onclick="setFiabView(\'roi\')">ROI</button><button class="fiab-tab'+(fiabView==='combi'?' on':'')+'" data-v="combi" onclick="setFiabView(\'combi\')" style="color:var(--y)">🎲 Combinés</button><button class="fiab-tab" data-v="tranches" onclick="showFiabLock(\'Tranches\',\'Analyse de précision par tranche de confiance\')" style="color:var(--dm)">🔒 Tranches</button><button class="fiab-tab" data-v="scores" onclick="showFiabLock(\'Scores\',\'Précision détaillée des prédictions de score\')" style="color:var(--dm)">🔒 Scores</button><button class="fiab-tab'+(fiabView==='selection'?' on':'')+'" data-v="selection" onclick="setFiabView(\'selection\')">Sélection</button><button class="fiab-tab" data-v="zeroo" onclick="showFiabLock(\'Analyse 0-0\',\'Corrélations et probabilités score nul\')" style="color:var(--dm)">🔒 0-0</button></div>';
   if(calibApplied){html+='<div style="background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:.64rem;line-height:1.7"><div style="font-weight:700;color:var(--g);margin-bottom:2px">⚡ Auto-calibration active</div><div style="color:var(--dm);font-family:var(--mono)">'+Object.entries(newCalib).map(function(e){var f=e[1],mkt=mkts.find(function(m){return m.id===e[0]});return'<span style="margin-right:5px">'+(mkt?mkt.label:e[0])+' '+(f>1.05?'↑':f<0.95?'↓':'≈')+'×'+f+'</span>'}).join('')+'</div></div>'}
   function accBox(id,lbl){var st=mktStats[id];if(!st||st.acc===null)return'<div class="sb"><div class="sv" style="color:var(--dm)">?</div><div class="sl">'+lbl+'</div></div>';var col=st.acc>=60?'var(--g)':st.acc>=45?'var(--y)':'var(--r)';return'<div class="sb"><div class="sv" style="color:'+col+'">'+st.acc+'%</div><div class="sl">'+lbl+'</div></div>'}
   if(fiabView==='resume'){
@@ -5901,173 +6526,67 @@ function renderFiabOut(){
     html+='</table></div>';
   }
   else if(fiabView==='roi'){
-    html+='<div class="st">ROI — 1€ PAR MISE ≥50%</div><div style="font-size:.66rem;color:var(--dm);margin-bottom:8px;font-family:var(--mono)">Simule 1€ par prédiction ≥ 50%. Cote = 1/prob × 0.9.</div>';
-    var roiRows=mkts.map(function(mkt){var st=mktStats[mkt.id];if(!st||st.acc===null||st.n<5)return null;var valid=entries.filter(function(t){return t[mkt.pKey]!==null&&t[mkt.pKey]>=50});var gain=0;valid.forEach(function(t){var prob=t[mkt.pKey]/100,cote=Math.min(10,Math.max(1.1,1/prob*0.9)),real=getRealVal(t,mkt);gain+=real?cote-1:-1});var roi=valid.length?Math.round(gain/valid.length*100)/100:0;return{mkt:mkt,n:valid.length,gain:Math.round(gain*100)/100,roi:roi,st:st}}).filter(Boolean).sort(function(a,b){return b.roi-a.roi});
-    html+='<div class="tbl"><table><tr><th>Marché</th><th>Mises</th><th>Gain</th><th>Prec.</th><th>ROI</th></tr>';
-    roiRows.forEach(function(row){var col=row.roi>0?'var(--g)':row.roi>-0.1?'var(--y)':'var(--r)';html+='<tr><td><b>'+row.mkt.label+'</b></td><td>'+row.n+'</td><td style="color:'+col+'">'+(row.gain>=0?'+':'')+row.gain+'€</td><td class="'+(row.st.acc>=60?'tg':row.st.acc>=45?'ty':'tr')+'">'+row.st.acc+'%</td><td style="color:'+col+';font-weight:700">'+(row.roi>=0?'+':'')+row.roi+'€</td></tr>'});
-    html+='</table></div>';
-    var roiPos=roiRows.filter(function(r){return r.roi>0});
-    html+='<div class="sg g2"><div class="sb" style="border-color:rgba(0,229,160,.3)"><div class="sv" style="color:var(--g)">'+roiPos.length+'</div><div class="sl">+ ROI</div></div><div class="sb" style="border-color:rgba(255,61,90,.3)"><div class="sv" style="color:var(--r)">'+(roiRows.length-roiPos.length)+'</div><div class="sl">- ROI</div></div></div>';
-  }
-  else if(fiabView==='tranches'){
-    html+='<div style="font-size:.63rem;color:var(--dm);margin-bottom:10px;font-family:var(--mono);line-height:1.6">Pour chaque marché : à quelle tranche de prédiction FootStats est-il le plus précis ? La tranche verte = zone de confiance maximale.</div>';
-    var TRANCHES=[{lbl:'<40%',min:0,max:39},{lbl:'40-49%',min:40,max:49},{lbl:'50-59%',min:50,max:59},{lbl:'60-69%',min:60,max:69},{lbl:'70-79%',min:70,max:79},{lbl:'80%+',min:80,max:100}];
-    mkts.forEach(function(mkt){
-      var valid=entries.filter(function(t){return t[mkt.pKey]!==null&&t[mkt.pKey]!==undefined;});
-      if(valid.length<5)return;
-      // Calculer précision par tranche
-      var trData=TRANCHES.map(function(tr){
-        var inTr=valid.filter(function(t){return t[mkt.pKey]>=tr.min&&t[mkt.pKey]<=tr.max;});
-        if(!inTr.length)return null;
-        var ok=inTr.filter(function(t){return getRealVal(t,mkt);}).length;
-        var acc=Math.round(ok/inTr.length*100);
-        var mid=Math.round((tr.min+tr.max)/2);
-        var delta=acc-mid; // calibration : réel vs attendu
-        return{lbl:tr.lbl,n:inTr.length,ok:ok,acc:acc,mid:mid,delta:delta};
-      }).filter(Boolean);
-      if(!trData.length)return;
-      // Trouver la meilleure tranche (précision la plus haute avec min 3 matchs)
-      var best=trData.filter(function(t){return t.n>=3;}).sort(function(a,b){return b.acc-a.acc;})[0];
-      html+='<div class="card" style="margin-bottom:8px;padding:10px">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-      html+='<span style="font-size:.75rem;font-weight:700">'+mkt.label+'</span>';
-      if(best)html+='<span style="font-size:.62rem;font-family:var(--mono);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--g);padding:2px 8px;border-radius:5px">Optimal: '+best.lbl+' → '+best.acc+'%</span>';
-      html+='</div>';
-      html+='<div class="bars">';
-      trData.forEach(function(tr){
-        var col=tr.acc>=65?'var(--g)':tr.acc>=50?'var(--y)':'var(--r)';
-        var isBest=best&&tr.lbl===best.lbl;
-        var deltaStr=(tr.delta>0?'+':'')+tr.delta+'%';
-        var deltacol=Math.abs(tr.delta)<=5?'var(--g)':Math.abs(tr.delta)<=10?'var(--y)':'var(--r)';
-        html+='<div class="br2" style="'+(isBest?'background:rgba(0,229,160,.04);border-radius:5px;padding:2px 0;':'')+'">'+
-          '<div class="bn" style="width:52px;'+(isBest?'color:var(--g);':'')+'">'+tr.lbl+'</div>'+
-          '<div class="bb2">'+
-            '<div class="bf" style="width:'+Math.min(100,tr.acc)+'%;background:'+col+'">'+
-              tr.acc+'% ('+tr.ok+'/'+tr.n+') <span style="color:'+deltacol+';margin-left:4px">Δ'+deltaStr+'</span>'+
-            '</div>'+
-          '</div>'+
-        '</div>';
+    var roiCfg=(function(){try{return JSON.parse(localStorage.getItem('fsa_roi_cfg')||'{}')}catch(e){return{}}})();
+    var mise=parseFloat(roiCfg.mise)||10;
+    var bankroll=parseFloat(roiCfg.bankroll)||500;
+    var roiStrat=roiCfg.strat||'all50';
+    var STRATEGIES=[
+      {id:'all50',  label:'Tout \u226550%',       icon:'\ud83d\udcca', desc:'Toutes les pr\xe9dictions \u226550%',              minPred:50,minConv:0},
+      {id:'conf60', label:'Confiant \u226560%',   icon:'\ud83c\udfaf', desc:'Pr\xe9dictions \u226560%, signal min 1/3',         minPred:60,minConv:1},
+      {id:'conf70', label:'Fort \u226570%',       icon:'\u26a1',       desc:'Pr\xe9dictions \u226570%, convergence min 2/3',    minPred:70,minConv:2},
+      {id:'sig3',   label:'3/3 uniquement',       icon:'\ud83d\udd25', desc:'Convergence maximale 3/3 uniquement',              minPred:50,minConv:3},
+      {id:'strict', label:'Strict \u226580%+3/3', icon:'\ud83d\udc8e', desc:'Le plus s\xe9lectif : \u226580% ET 3/3',          minPred:80,minConv:3},
+    ];
+    var curStrat=STRATEGIES.find(function(s){return s.id===roiStrat})||STRATEGIES[0];
+
+    // Fonction simulation
+    function simMkt(mkt,minPred,minConv){
+      var st=mktStats[mkt.id];if(!st||st.acc===null||st.n<5)return null;
+      var valid=entries.filter(function(t){
+        // Filtre version
+        if(roiVer==='v2'&&!t._v2)return false;
+        if(roiVer==='v1'&&t._v2)return false;
+        if(t[mkt.pKey]===null||t[mkt.pKey]<minPred)return false;
+        if(minConv>0){
+          var mktConv=tkMktConv(t,mkt.id);
+          if(mktConv<minConv)return false;
+        }
+        return true;
       });
-      html+='</div>';
-      // Note si tranche faible meilleure que haute
-      var trFaibles=trData.filter(function(t){return t.mid<50&&t.n>=3;});
-      var trHautes=trData.filter(function(t){return t.mid>=50&&t.n>=3;});
-      if(trFaibles.length&&trHautes.length){
-        var bestFaible=trFaibles.sort(function(a,b){return b.acc-a.acc;})[0];
-        var bestHaute=trHautes.sort(function(a,b){return b.acc-a.acc;})[0];
-        if(bestFaible.acc>bestHaute.acc+5){
-          html+='<div style="margin-top:6px;font-size:.6rem;color:var(--y);font-family:var(--mono)">⚠️ Les prédictions faibles (&lt;50%) sont plus fiables que les hautes — logique inverse détectée</div>';
-        }
-      }
-      html+='</div>';
+      if(valid.length<3)return null;
+      var savedCote=parseFloat((roiCfg.cotes&&roiCfg.cotes[mkt.id])||0);
+      var profit=0,series=[],bank=bankroll,minBank=bankroll,maxDD=0,peakBank=bankroll,breakEvenAt=null;
+      valid.forEach(function(t,i){
+        var prob=t[mkt.pKey]/100;
+        var cote=savedCote>1?savedCote:Math.min(10,Math.max(1.1,1/prob*0.9));
+        var real=getRealVal(t,mkt);
+        var gain=real?(mise*(cote-1)):(-mise);
+        profit+=gain;bank+=gain;
+        if(bank>peakBank)peakBank=bank;
+        var dd=peakBank-bank;if(dd>maxDD)maxDD=dd;
+        if(bank<minBank)minBank=bank;
+        if(breakEvenAt===null&&profit>=0&&i>0)breakEvenAt=i+1;
+        series.push(Math.round(bank));
+      });
+      var roi=valid.length?Math.round(profit/valid.length/mise*100)/100:0;
+      return{n:valid.length,profit:Math.round(profit*100)/100,roi:roi,series:series,
+        maxDD:Math.round(maxDD),bankNeeded:Math.max(0,Math.round(maxDD+mise)),
+        minBank:Math.round(minBank),breakEvenAt:breakEvenAt,finalBank:Math.round(bank)};
+    }
+
+    // Formulaire
+    html+='<div class="card" style="margin-bottom:10px;padding:12px">';
+    html+='<div class="st" style="margin-top:0;margin-bottom:8px">\u2699\ufe0f PARAM\u00c8TRES SIMULATION</div>';
+    html+='<div class="r2" style="margin-bottom:10px">';
+    html+='<div><div class="lsm">Mise fixe (\u20ac)</div><input class="inp" id="roiMise" type="number" min="1" step="1" value="'+mise+'" placeholder="Ex: 10" oninput="saveRoiCfg()"/></div>';
+    html+='<div><div class="lsm">Bankroll d\xe9part (\u20ac)</div><input class="inp" id="roiBankroll" type="number" min="1" step="10" value="'+bankroll+'" placeholder="Ex: 500" oninput="saveRoiCfg()"/></div>';
+    html+='</div>';
+    // Filtre v1/v2
+    var roiVer=roiCfg.ver||'all';
+    html+='<div class="lsm" style="margin-bottom:5px">🔬 Comparer les systèmes</div>';
+    html+='<div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap">';
+    [{id:'all',label:'Tous'},{id:'v2',label:'✨ v2 (signaux/marché)'},{id:'v1',label:'v1 (ancien)'}].forEach(function(vt){
+      var active=vt.id===roiVer;
+      html+='<div onclick="saveRoiCfg(\'ver\',\''+vt.id+'\')" style="cursor:pointer;padding:5px 10px;border-radius:7px;font-size:.63rem;border:1px solid '+(active?'var(--g)':'var(--bd)')+';color:'+(active?'var(--g)':'var(--dm)')+';background:'+(active?'rgba(0,229,160,.08)':'transparent')+'">'  +vt.label+'</div>';
     });
-  }
-  else if(fiabView==='scores'){
-    var scoreStats=calcScorePrecision();
-    if(scoreStats){
-      html+=renderScorePrecision(scoreStats)||'';
-    } else {
-      html+='<div style="font-size:.7rem;color:var(--dm);padding:14px;text-align:center;font-family:var(--mono)">Pas assez de données — Lance la Sync globale puis ouvre quelques scénarios de matchs pour alimenter les prédictions de score.</div>';
-    }
-  }
-  else if(fiabView==='selection'){
-    html+=renderBilanSelection(entries,s)||'';
-  }
-  else if(fiabView==='zeroo'){
-    var all00=get00Stats();
-    if(!all00.length){
-      html+='<div style="padding:18px;text-align:center;color:var(--dm);font-size:.7rem">Aucun match en base.</div>';
-    } else {
-      var tot00=all00.length,nb00s=all00.filter(function(m){return m.h===0&&m.a===0}).length;
-      var rate00=Math.round(nb00s/tot00*100);
-      html+='<div class="sg g3" style="margin-bottom:12px">';
-      html+='<div class="sb" style="border-color:rgba(176,107,255,.35)"><div class="sv" style="color:var(--p);font-size:1.8rem">'+rate00+'%</div><div class="sl">Taux global 0-0</div></div>';
-      html+='<div class="sb"><div class="sv" style="color:var(--g)">'+nb00s+'</div><div class="sl">Matchs 0-0</div></div>';
-      html+='<div class="sb"><div class="sv" style="color:var(--dm)">'+tot00+'</div><div class="sl">Total base</div></div></div>';
-      var ligMap00={};
-      all00.forEach(function(m){var k=m.league||'?';if(!ligMap00[k])ligMap00[k]={total:0,n00:0};ligMap00[k].total++;if(m.h===0&&m.a===0)ligMap00[k].n00++;});
-      var ligArr00=Object.keys(ligMap00).map(function(k){return{name:k,total:ligMap00[k].total,n00:ligMap00[k].n00,rate:ligMap00[k].n00/ligMap00[k].total}}).filter(function(x){return x.total>=5}).sort(function(a,b){return b.rate-a.rate}).slice(0,8);
-      if(ligArr00.length){
-        html+='<div class="st" style="margin-bottom:8px">Par ligue (top 8)</div><div class="bars">';
-        ligArr00.forEach(function(l){var p=Math.round(l.rate*100);var col=p>=15?'var(--p)':(p>=8?'var(--y)':'var(--dm)');html+='<div class="br2"><div class="bn">'+l.name.substring(0,16)+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*5)+'%;background:'+col+'">'+p+'% ('+l.n00+'/'+l.total+')</div></div></div>';});
-        html+='</div>';
-      }
-      var hourMap00={};
-      all00.forEach(function(m){if(!m.heure)return;var h=parseInt(m.heure.split(':')[0]);if(isNaN(h))return;if(!hourMap00[h])hourMap00[h]={total:0,n00:0};hourMap00[h].total++;if(m.h===0&&m.a===0)hourMap00[h].n00++;});
-      var hourArr00=Object.keys(hourMap00).filter(function(h){return hourMap00[h].total>=3}).sort(function(a,b){return parseInt(a)-parseInt(b)});
-      if(hourArr00.length){
-        html+='<div class="st" style="margin:12px 0 8px">Par heure</div><div class="bars">';
-        hourArr00.forEach(function(h){var e=hourMap00[h];var p=Math.round(e.n00/e.total*100);var col=p>=15?'var(--p)':(p>=8?'var(--y)':'var(--dm)');html+='<div class="br2"><div class="bn" style="width:42px">'+h+'h</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*5)+'%;background:'+col+'">'+p+'% ('+e.n00+'/'+e.total+')</div></div></div>';});
-        html+='</div>';
-      }
-      var DAYS00=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'],dayMap00={};
-      all00.forEach(function(m){if(!m.date)return;var d=new Date(m.date).getDay();var k=DAYS00[d];if(!dayMap00[k])dayMap00[k]={total:0,n00:0};dayMap00[k].total++;if(m.h===0&&m.a===0)dayMap00[k].n00++;});
-      if(Object.keys(dayMap00).length){
-        html+='<div class="st" style="margin:12px 0 8px">Par jour</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">';
-        DAYS00.forEach(function(d){var e=dayMap00[d]||{total:0,n00:0};if(!e.total){html+='<div style="background:var(--s1);border-radius:6px;padding:6px 0;text-align:center;color:var(--dm)"><div style="font-weight:700;font-size:.7rem">'+d+'</div>—</div>';return;}var p=Math.round(e.n00/e.total*100);var col=p>=15?'#b06bff':(p>=8?'var(--y)':'var(--dm)');html+='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:6px;padding:6px 4px;text-align:center"><div style="font-weight:700;font-size:.7rem;color:var(--tx)">'+d+'</div><div style="font-size:.8rem;font-weight:900;color:'+col+'">'+p+'%</div><div style="font-size:.55rem;color:var(--dm)">'+e.n00+'/'+e.total+'</div></div>';});
-        html+='</div>';
-      }
-      var track00=getTrackCompat();
-      if(track00.length>=5){
-        var saved00w=window._00stats;window._00stats=all00;
-        var buckets00=[{lbl:'0-9%',min:0,max:9,total:0,ok:0},{lbl:'10-19%',min:10,max:19,total:0,ok:0},{lbl:'20-29%',min:20,max:29,total:0,ok:0},{lbl:'30-39%',min:30,max:39,total:0,ok:0},{lbl:'40-49%',min:40,max:49,total:0,ok:0},{lbl:'50%+',min:50,max:100,total:0,ok:0}];
-        track00.forEach(function(t){if(t.rH===undefined||t.rA===undefined||!t.pred)return;var fk={league:t.league||'?',heure:t.heure||'00:00',date:t.date||null};var p00k=compute00Badge(fk,t.pred);if(p00k===null)return;buckets00.forEach(function(b){if(p00k>=b.min&&p00k<=b.max){b.total++;if(t.rH===0&&t.rA===0)b.ok++;}});});
-        window._00stats=saved00w;
-        var actB=buckets00.filter(function(b){return b.total>=2;});
-        if(actB.length){
-          html+='<div class="st" style="margin:12px 0 8px">Tranches prédiction 0-0 → taux réel</div><div class="bars" style="margin-bottom:8px">';
-          actB.forEach(function(b){var p=b.total>0?Math.round(b.ok/b.total*100):0;var col=p>=25?'var(--p)':(p>=12?'var(--y)':'var(--dm)');html+='<div class="br2"><div class="bn" style="width:50px;font-size:.62rem">'+b.lbl+'</div><div class="bb2"><div class="bf" style="width:'+Math.min(100,p*4)+'%;background:'+col+'">'+p+'% ('+b.ok+'/'+b.total+')</div></div></div>';});
-          html+='</div><div class="tbl"><table><thead><tr><th>Tranche</th><th>Matchs</th><th>0-0</th><th>Taux</th><th>Signal</th></tr></thead><tbody>';
-          actB.forEach(function(b){var p=b.total>0?Math.round(b.ok/b.total*100):0;var col=p>=25?'tg':p>=12?'ty':'';var sig=p>=25?'&#x1F7E2; Fort':p>=15?'&#x1F7E1; Modéré':'&#x26AA; Faible';html+='<tr><td style="font-weight:700;color:var(--p)">'+b.lbl+'</td><td>'+b.total+'</td><td>'+b.ok+'</td><td class="'+col+'">'+p+'%</td><td style="font-size:.6rem">'+sig+'</td></tr>';});
-          html+='</tbody></table></div>';
-          var bestB00=actB.filter(function(b){return b.total>=3;}).slice().sort(function(a,b){return(b.ok/b.total)-(a.ok/a.total);})[0];
-          if(bestB00){var bp=Math.round(bestB00.ok/bestB00.total*100);html+='<div style="margin-top:8px;padding:9px 12px;background:rgba(176,107,255,.08);border:1px solid rgba(176,107,255,.3);border-radius:8px;font-size:.66rem;line-height:1.6"><span style="font-weight:900;color:var(--p)">&#x1F3AF; Meilleure tranche :</span> Badge <strong style="color:var(--p)">'+bestB00.lbl+'</strong> → <strong style="color:var(--p)">'+bp+'%</strong> de 0-0 réel ('+bestB00.ok+'/'+bestB00.total+').</div>';}
-        }
-      }
-    }
-  }
-    html+='<div class="sg g2" style="margin-top:12px"><button class="bsm" onclick="exportTrack()" style="padding:9px;text-align:center">Exporter JSON</button><button class="bsm" onclick="clearTrack()" style="padding:9px;text-align:center;color:var(--r);border-color:var(--r)">Effacer tracking</button></div>';
-  var out=document.getElementById('fiabOut');out.innerHTML=html;out.style.display='block';
-  if(fiabView==='marches'){setTimeout(function(){var fb=document.querySelector('#marchesSelRow .mkt-sel-btn');if(fb)fb.click()},60)}
-
-  }catch(e){showAl('fiabAl','er','Erreur rendu fiabilité: '+e.message);}
-}
-function showMarcheFor(id,btn){
-  document.querySelectorAll('#marchesSelRow .mkt-sel-btn').forEach(function(b){b.classList.remove('on')});btn.classList.add('on');
-  var d=window._calibData&&window._calibData[id],f=window._calibFact&&window._calibFact[id],cd=window._convData&&window._convData[id];
-  var panel=document.getElementById('marcheDetail');
-  if(!d){panel.innerHTML='<div style="padding:18px;text-align:center;color:var(--dm);font-family:var(--mono);font-size:.7rem">Pas assez de données (min 3 matchs)</div>';return}
-  var fcol=f?(f>1.05?'var(--b)':f<0.95?'var(--r)':'var(--g)'):'var(--dm)';
-  var flab=f?(f>1.05?'Sous-prédit — ×'+f+' appliqué':f<0.95?'Sur-prédit — ×'+f+' appliqué':'Calibration OK'):'Non calibré';
-  var acccol=d.stats.acc>=60?'var(--g)':d.stats.acc>=45?'var(--y)':'var(--r)';
-  var h='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:10px">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><div style="font-weight:900;font-size:.96rem">'+d.label+'</div><div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-top:2px">'+d.stats.n+' matchs</div></div>'+(f?'<div style="background:rgba(0,0,0,.2);border:1px solid var(--bd2);border-radius:7px;padding:5px 9px;text-align:center"><div style="font-size:.5rem;color:var(--dm);font-family:var(--mono)">FACTEUR</div><div style="font-size:.98rem;font-weight:900;color:'+fcol+'">×'+f+'</div></div>':'')+'</div>';
-  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px"><div style="background:var(--s2);border-radius:7px;padding:7px 4px;text-align:center"><div style="font-size:1rem;font-weight:900;color:'+acccol+'">'+d.stats.acc+'%</div><div style="font-size:.48rem;color:var(--dm);margin-top:2px;font-family:var(--mono)">Précision</div></div><div style="background:var(--s2);border-radius:7px;padding:7px 4px;text-align:center"><div style="font-size:1rem;font-weight:900;color:var(--b)">'+d.stats.brier+'</div><div style="font-size:.48rem;color:var(--dm);margin-top:2px;font-family:var(--mono)">Brier</div></div><div style="background:var(--s2);border-radius:7px;padding:7px 4px;text-align:center"><div style="font-size:1rem;font-weight:900;color:var(--y)">'+d.stats.realRate+'%</div><div style="font-size:.48rem;color:var(--dm);margin-top:2px;font-family:var(--mono)">Taux réel</div></div><div style="background:var(--s2);border-radius:7px;padding:7px 4px;text-align:center"><div style="font-size:1rem;font-weight:900;color:var(--p)">'+d.stats.predAvg+'%</div><div style="font-size:.48rem;color:var(--dm);margin-top:2px;font-family:var(--mono)">Pred. moy</div></div></div>';
-  h+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px"><div style="flex:1;height:5px;background:var(--s2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+d.stats.acc+'%;background:'+acccol+';border-radius:3px"></div></div><span style="font-size:.58rem;color:var(--dm);font-family:var(--mono)">'+d.stats.acc+'%</span></div>';
-  h+='<div style="background:rgba(0,0,0,.15);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font-size:.62rem;color:'+fcol+';font-family:var(--mono)">⚙ '+flab+'</div></div>';
-  h+='<div style="font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--dm);font-family:var(--mono);margin-bottom:6px">CALIBRATION PAR TRANCHE</div>';
-  h+='<div style="border:1px solid var(--bd);border-radius:9px;overflow:hidden;margin-bottom:10px"><table style="width:100%;border-collapse:collapse;font-size:.7rem"><tr style="background:var(--s2)"><th style="padding:7px 9px;text-align:left;font-size:.54rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--dm);font-family:var(--mono)">PRED.</th><th style="padding:7px 9px;text-align:left;font-size:.54rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--dm);font-family:var(--mono)">N</th><th style="padding:7px 9px;text-align:left;font-size:.54rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--dm);font-family:var(--mono)">RÉEL</th><th style="padding:7px 9px;text-align:left;font-size:.54rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--dm);font-family:var(--mono)">ÉCART</th></tr>';
-  d.tranches.forEach(function(tr){var reel=Math.round(tr.ok/tr.n*100),mid=Math.round((tr.min+tr.max)/2),biais=reel-mid,bs=(biais>=0?'+':'')+biais+'%',bc=Math.abs(biais)<=10?'var(--g)':Math.abs(biais)<=20?'var(--y)':'var(--r)',rc=reel>=60?'var(--g)':reel>=45?'var(--y)':'var(--r)';h+='<tr style="border-top:1px solid var(--bd)"><td style="padding:7px 9px;font-weight:700">'+tr.lbl+'</td><td style="padding:7px 9px;color:var(--dm)">'+tr.n+'</td><td style="padding:7px 9px;font-weight:700;color:'+rc+'">'+reel+'%</td><td style="padding:7px 9px;font-weight:700;color:'+bc+'">'+bs+'</td></tr>'});
-  h+='</table></div>';
-  h+='<div style="font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--dm);font-family:var(--mono);margin-bottom:6px">BIAIS VISUELS</div>';
-  d.tranches.forEach(function(tr){var reel=Math.round(tr.ok/tr.n*100),mid=Math.round((tr.min+tr.max)/2),biais=reel-mid,bc=Math.abs(biais)<=10?'var(--g)':Math.abs(biais)<=20?'var(--y)':'var(--r)',w=Math.min(100,Math.abs(biais)*4),bs=(biais>=0?'+':'')+biais+'%';h+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:52px;text-align:right;color:var(--dm);font-family:var(--mono);font-size:.6rem;flex-shrink:0">'+tr.lbl+'</div><div style="flex:1;height:17px;background:var(--s2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:'+bc+';border-radius:3px;display:flex;align-items:center;padding-left:5px;font-size:.58rem;font-weight:700;color:#000">'+(w>20?bs:'')+'</div></div><div style="width:36px;font-size:.62rem;color:'+bc+';flex-shrink:0;font-weight:700">'+bs+'</div></div>'});
-  if(cd&&cd.some(function(cs){return cs.n>0})){
-    h+='<div style="font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--dm);font-family:var(--mono);margin:12px 0 5px">PRÉCISION PAR CONVERGENCE</div>';
-    var labels=['0 signal','1/3','2/3','3/3 ⚡'];
-    cd.forEach(function(cs,i){if(!cs.n)return;var p=Math.round(cs.ok/cs.n*100),col=p>=65?'var(--g)':p>=50?'var(--y)':'var(--r)';h+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px"><div style="width:54px;text-align:right;color:var(--dm);font-family:var(--mono);font-size:.58rem;flex-shrink:0">'+labels[i]+'</div><div style="flex:1;height:19px;background:var(--s2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+col+';border-radius:4px;display:flex;align-items:center;padding-left:5px;font-size:.62rem;font-weight:700;color:#000">'+(p>15?p+'%':'')+'</div></div><div style="width:50px;font-size:.6rem;font-family:var(--mono);flex-shrink:0"><span style="color:'+col+';font-weight:700">'+p+'%</span><span style="color:var(--dm);font-size:.54rem"> ('+cs.n+')</span></div></div>'});
-  }
-  panel.innerHTML=h;
-}
-function exportTrack(){var blob=new Blob([JSON.stringify(getTrack(),null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tracking_'+today()+'.json';a.click()}
-function clearTrack(){if(!confirm('Effacer tout le tracking?'))return;localStorage.removeItem(TRACK_KEY);document.getElementById('fiabOut').style.display='none';showAl('fiabAl','in','Tracking effacé');setTimeout(function(){hideAl('fiabAl')},2500)}
-
-// ═══════════════════════════════════ INIT ═══
-buildTz();initCfg();majDB();preset(2);loadRecalageWeights();loadScoreWeights();
-document.getElementById('tdDate').value=today();
-document.getElementById('tkDate').value=today();
-initMultiTab();
-renderAnHist();
-initStDates();initSyncDates();
-</script>
-</body>
-</html>
+    html+='</div>';
