@@ -4812,15 +4812,17 @@ async function startDump(){
         fxResp.data.forEach(function(m){
           if(!m.id)return;
           var date=m.utc_date?m.utc_date.split('T')[0]:null;
+          var ts=m.utc_date?Math.floor(new Date(m.utc_date).getTime()/1000):0;
           var hScore=m.score&&m.score.home;
           var aScore=m.score&&m.score.away;
-          // Stocker uniquement l'essentiel : équipes + date + score
+          // Stocker l'essentiel : équipes + date + heure (ts UTC) + score
           if(!dumpDB[m.id]){
             dumpDB[m.id]={
               id:m.id,
               h:m.home_team&&m.home_team.name,
               a:m.away_team&&m.away_team.name,
               date:date,
+              ts:ts,
               comp:cs.comp.name,
               sh:hScore,  // score home
               sa:aScore,  // score away
@@ -6989,55 +6991,60 @@ function renderFiabOut(){
     } // end eligible check
   }
     else if(fiabView==='tranches'){
-    html+='<div style="font-size:.63rem;color:var(--dm);margin-bottom:10px;font-family:var(--mono);line-height:1.6">Pour chaque marché : à quelle tranche de prédiction FootStats est-il le plus précis ? La tranche verte = zone de confiance maximale.</div>';
-    var TRANCHES=[{lbl:'<40%',min:0,max:39},{lbl:'40-49%',min:40,max:49},{lbl:'50-59%',min:50,max:59},{lbl:'60-69%',min:60,max:69},{lbl:'70-79%',min:70,max:79},{lbl:'80%+',min:80,max:100}];
+    html+='<div style="font-size:.63rem;color:var(--dm);margin-bottom:10px;font-family:var(--mono);line-height:1.6">Pour chaque marché : précision réelle à CHAQUE pourcentage prédit (pas de regroupement). Permet de repérer précisément les valeurs les plus profitables.</div>';
+    html+='<div style="margin-bottom:10px;display:flex;gap:6px;align-items:center">';
+    html+='<span class="lsm" style="margin:0">N min par %</span>';
+    html+='<input class="inp" id="trMinN" type="number" value="'+(window._trMinN||3)+'" min="1" max="20" style="width:60px;font-size:.7rem;padding:5px" onchange="window._trMinN=parseInt(this.value)||3;renderFiabOut();"/>';
+    html+='</div>';
+    var minN=window._trMinN||3;
+
     mkts.forEach(function(mkt){
       var valid=entries.filter(function(t){return t[mkt.pKey]!==null&&t[mkt.pKey]!==undefined;});
       if(valid.length<5)return;
-      // Calculer précision par tranche
-      var trData=TRANCHES.map(function(tr){
-        var inTr=valid.filter(function(t){return t[mkt.pKey]>=tr.min&&t[mkt.pKey]<=tr.max;});
-        if(!inTr.length)return null;
-        var ok=inTr.filter(function(t){return getRealVal(t,mkt);}).length;
-        var acc=Math.round(ok/inTr.length*100);
-        var mid=Math.round((tr.min+tr.max)/2);
-        var delta=acc-mid; // calibration : réel vs attendu
-        return{lbl:tr.lbl,n:inTr.length,ok:ok,acc:acc,mid:mid,delta:delta};
-      }).filter(Boolean);
-      if(!trData.length)return;
-      // Trouver la meilleure tranche (précision la plus haute avec min 3 matchs)
-      var best=trData.filter(function(t){return t.n>=3;}).sort(function(a,b){return b.acc-a.acc;})[0];
+
+      // Grouper par pourcentage EXACT (0-100)
+      var byPct={};
+      valid.forEach(function(t){
+        var p=t[mkt.pKey];
+        if(!byPct[p])byPct[p]={n:0,ok:0};
+        byPct[p].n++;
+        if(getRealVal(t,mkt))byPct[p].ok++;
+      });
+
+      var pctData=Object.keys(byPct).map(function(p){
+        var d=byPct[p];
+        var acc=Math.round(d.ok/d.n*100);
+        var delta=acc-parseInt(p);
+        return{pct:parseInt(p),n:d.n,ok:d.ok,acc:acc,delta:delta};
+      }).filter(function(d){return d.n>=minN;}).sort(function(a,b){return a.pct-b.pct;});
+
+      if(!pctData.length)return;
+
+      var best=pctData.slice().sort(function(a,b){return b.acc-a.acc;})[0];
+
       html+='<div class="card" style="margin-bottom:8px;padding:10px">';
       html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
       html+='<span style="font-size:.75rem;font-weight:700">'+mkt.label+'</span>';
-      if(best)html+='<span style="font-size:.62rem;font-family:var(--mono);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--g);padding:2px 8px;border-radius:5px">Optimal: '+best.lbl+' → '+best.acc+'%</span>';
+      html+='<span style="font-size:.6rem;font-family:var(--mono);color:var(--dm)">'+pctData.length+' valeurs (≥'+minN+' matchs)</span>';
       html+='</div>';
-      html+='<div class="bars">';
-      trData.forEach(function(tr){
-        var col=tr.acc>=65?'var(--g)':tr.acc>=50?'var(--y)':'var(--r)';
-        var isBest=best&&tr.lbl===best.lbl;
-        var deltaStr=(tr.delta>0?'+':'')+tr.delta+'%';
-        var deltacol=Math.abs(tr.delta)<=5?'var(--g)':Math.abs(tr.delta)<=10?'var(--y)':'var(--r)';
-        html+='<div class="br2" style="'+(isBest?'background:rgba(0,229,160,.04);border-radius:5px;padding:2px 0;':'')+'">'+
-          '<div class="bn" style="width:52px;'+(isBest?'color:var(--g);':'')+'">'+tr.lbl+'</div>'+
+      if(best)html+='<div style="font-size:.62rem;font-family:var(--mono);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--g);padding:4px 8px;border-radius:5px;margin-bottom:8px;display:inline-block">🎯 Plus profitable: '+best.pct+'% prédit → '+best.acc+'% réel ('+best.ok+'/'+best.n+')</div>';
+
+      html+='<div class="bars" style="max-height:340px;overflow-y:auto">';
+      pctData.forEach(function(d){
+        var col=d.acc>=65?'var(--g)':d.acc>=50?'var(--y)':'var(--r)';
+        var isBest=best&&d.pct===best.pct;
+        var deltaStr=(d.delta>0?'+':'')+d.delta+'%';
+        var deltacol=Math.abs(d.delta)<=5?'var(--g)':Math.abs(d.delta)<=10?'var(--y)':'var(--r)';
+        html+='<div class="br2" style="'+(isBest?'background:rgba(0,229,160,.06);border-radius:5px;padding:2px 0;':'')+'">'+
+          '<div class="bn" style="width:40px;'+(isBest?'color:var(--g);font-weight:700;':'')+'">'+d.pct+'%</div>'+
           '<div class="bb2">'+
-            '<div class="bf" style="width:'+Math.min(100,tr.acc)+'%;background:'+col+'">'+
-              tr.acc+'% ('+tr.ok+'/'+tr.n+') <span style="color:'+deltacol+';margin-left:4px">Δ'+deltaStr+'</span>'+
+            '<div class="bf" style="width:'+Math.min(100,d.acc)+'%;background:'+col+'">'+
+              d.acc+'% ('+d.ok+'/'+d.n+') <span style="color:'+deltacol+';margin-left:4px">Δ'+deltaStr+'</span>'+
             '</div>'+
           '</div>'+
         '</div>';
       });
       html+='</div>';
-      // Note si tranche faible meilleure que haute
-      var trFaibles=trData.filter(function(t){return t.mid<50&&t.n>=3;});
-      var trHautes=trData.filter(function(t){return t.mid>=50&&t.n>=3;});
-      if(trFaibles.length&&trHautes.length){
-        var bestFaible=trFaibles.sort(function(a,b){return b.acc-a.acc;})[0];
-        var bestHaute=trHautes.sort(function(a,b){return b.acc-a.acc;})[0];
-        if(bestFaible.acc>bestHaute.acc+5){
-          html+='<div style="margin-top:6px;font-size:.6rem;color:var(--y);font-family:var(--mono)">⚠️ Les prédictions faibles (&lt;50%) sont plus fiables que les hautes — logique inverse détectée</div>';
-        }
-      }
       html+='</div>';
     });
   }
@@ -7317,10 +7324,11 @@ function importDumpToBase(){
         var country=compParts.length>1?compParts[0]:'?';
         var league=compParts.length>1?compParts[1]:(e.comp||'?');
 
+        var entryTs=e.ts||0;
         var m={
           id:'dump_'+e.id,
-          ts:0,
-          heure:'??:??',
+          ts:entryTs,
+          heure:entryTs?tsH(entryTs,getTz()):'??:??',
           status:'FT',
           elapsed:90,
           league:league,
@@ -7350,19 +7358,12 @@ function importDumpToBase(){
       return;
     }
 
-    // Écriture finale par batch pour éviter overflow
-    try{
-      localStorage.setItem(DB_KEY,JSON.stringify(db));
-    }catch(ex){
-      // Fallback : écrire date par date
-      var db2=getDB();
-      dates.forEach(function(d){
-        try{db2[d]=db[d];localStorage.setItem(DB_KEY,JSON.stringify(db2));}catch(e2){}
-      });
-    }
-
-    majDB();
-    showAl('dumpAl','ok','\u2705 Import terminé — '+added+' matchs ajoutés, '+skipped+' déjà présents');
+    // Écriture finale dans IndexedDB (pas localStorage - migré vers IDB)
+    _dbCache=db;
+    saveDBToIDB(db).then(function(){
+      majDB();
+      showAl('dumpAl','ok','✅ Import terminé — '+added+' matchs ajoutés, '+skipped+' déjà présents');
+    });
   }
 
   nextBatch();
@@ -7387,9 +7388,10 @@ function exportDumpAsDB(){
     var country=compParts.length>1?compParts[0]:'?';
     var league=compParts.length>1?compParts[1]:(e.comp||'?');
 
+    var entryTs2=e.ts||0;
     var m={
       id:'dump_'+e.id,
-      ts:0,heure:'??:??',
+      ts:entryTs2,heure:entryTs2?tsH(entryTs2,getTz()):'??:??',
       status:'FT',elapsed:90,
       league:league,country:country,
       home:e.h||'?',away:e.a||'?',
