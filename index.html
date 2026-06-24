@@ -611,6 +611,21 @@ tr:hover td{background:var(--s2)}
     <div id="anAutoInfo" style="display:none;background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.2);border-radius:7px;padding:8px 11px;font-size:.64rem;color:var(--g);font-family:var(--mono);margin-bottom:10px"></div>
   </div>
 
+  <!-- LISTE EQUIPES DISPONIBLES -->
+  <div class="card" style="margin-bottom:10px;padding:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="clbl" style="margin-bottom:0">📋 �quipes disponibles</span>
+      <button class="bsm" onclick="toggleAnTeamList()" id="anTeamListBtn" style="font-size:.62rem">▼ Afficher</button>
+    </div>
+    <div id="anTeamListPanel" style="display:none;margin-top:10px">
+      <input class="inp" id="anTeamSearch" placeholder="Rechercher une �quipe..." oninput="renderAnTeamList()" style="font-size:.72rem;margin-bottom:8px"/>
+      <div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-bottom:6px">
+        Seuil min : <input type="number" id="anTeamMinMatch" value="5" min="1" max="50" oninput="renderAnTeamList()" style="width:40px;padding:2px 4px;font-size:.6rem;background:var(--s2);border:1px solid var(--bd);border-radius:4px;color:var(--tx)"/> matchs
+      </div>
+      <div id="anTeamListOut" style="max-height:300px;overflow-y:auto"></div>
+    </div>
+  </div>
+
   <!-- TEAM CARDS AUTO-FILLED -->
   <div class="team-cards" id="anTeamCards">
     <div class="tc home">
@@ -1210,6 +1225,8 @@ tr:hover td{background:var(--s2)}
         </div>
       </div>
     </div>
+    <button class="bsm" onclick="trainAndShowML()" id="mlTrainBtn" style="width:100%;padding:9px;text-align:center;color:var(--p);border-color:var(--p);margin-bottom:6px">🧠 Entraîner le modèle ML</button>
+    <div id="mlStatusBar" style="display:none;font-size:.6rem;font-family:var(--mono);color:var(--dm);margin-bottom:6px;padding:6px;background:var(--s2);border-radius:6px"></div>
     <button class="btn bb" onclick="calcFiabilite()" style="margin-bottom:7px">📊 Analyser la fiabilité</button>
     <button class="bsm" onclick="resetCalib()" style="width:100%;padding:9px;text-align:center;color:var(--y)">Réinitialiser la calibration</button>
     <button class="bsm" onclick="resetDumpCountries()" style="width:100%;padding:9px;text-align:center;color:var(--r);margin-top:5px">↩ Réinitialiser les pays dump mal assignés</button>
@@ -1782,7 +1799,8 @@ function buildTrackEntry(m,pred,s,h,a){
     p12:pred.dc12!==null?Math.round(pred.dc12*100):null,
     cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0,
     ms:(function(){if(!pred.mktSignals)return null;var ms={};['over','under','btts','bttsN','v1','x','v2','dc1x','dcx2','dc12','csH','csA','hmsc','amsc'].forEach(function(k){if(pred.mktSignals[k])ms[k]={c:pred.mktSignals[k].conv,n:pred.mktSignals[k].nbSig};});return ms;})(),
-    _v2:true};
+    ms:ms,_v2:true,
+    pML:(window._mlModels&&m._predML)?{over:m._predML.over!==undefined?Math.round(m._predML.over*100):null,btts:m._predML.btts!==undefined?Math.round(m._predML.btts*100):null,v1:m._predML.v1!==undefined?Math.round(m._predML.v1*100):null,x:m._predML.x!==undefined?Math.round(m._predML.x*100):null,v2:m._predML.v2!==undefined?Math.round(m._predML.v2*100):null}:null};
 }
 // Accesseurs de compatibilité pour le code existant qui lit les anciens noms de champs
 function tkCompat(t){
@@ -3276,6 +3294,16 @@ function buildMatchHTML(m,pred,s){
   var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="sig-row" style="margin:0;flex:1">'+sigBadge('L',_mktSig2.sigL)+sigBadge('H',_mktSig2.sigH)+sigBadge('J',_mktSig2.sigD)+calibBadge+'</div><span class="conv-star conv-'+_mktSig2.conv+'">'+_mktSig2.conv+'/'+_mktSig2.nbSig+' ⚡</span></div>';
   var sa=pred.seuilAdapte;
   if(sa!==null&&sa!==s)html+='<div style="font-size:.6rem;background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.18);border-radius:5px;padding:3px 7px;margin-bottom:6px;color:var(--y)">Seuil adapté: +'+sa+' (moy '+pred.moyButs+' buts/match)</div>';
+  var mlP=m._predML;
+
+  // Helper ML box
+  function mlBox(val,lbl){
+    if(val===null||val===undefined)return'';
+    var v=Math.round(val*100);
+    var cl=v>=60?'mv-g':v>=45?'mv-y':'mv-r';
+    return'<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+cl+'" style="font-size:.7rem">'+v+'%</div><div class="mkt-lbl" style="color:var(--p)">'+lbl+'</div></div>';
+  }
+
   var ligS=pred.ligStats;
   if(tdMkt==='auto'){
     if(pred.bestMarket)html+='<div class="dominant-badge">⭐ '+pred.bestMarket.label+' — '+Math.round(pred.bestMarket.prob*100)+'%</div>';
@@ -3412,6 +3440,7 @@ async function loadMatchs(source){
   fx.forEach(function(m){
     try{m._pred=cache.total>0?predict(m,cache,seuilTd,liveCtx):null;}
     catch(e){m._pred=null;}
+    m._predML=_mlTrained?mlPredictMatch(m._pred,m):null;
   });
   fx.sort(function(a,b){var ca=a._pred?a._pred.convergence:-1,cb=b._pred?b._pred.convergence:-1;if(cb!==ca)return cb-ca;return(a.heure||'').localeCompare(b.heure||'')});
   allMatchsCache=fx; // TOUS les matchs sans filtre mode
@@ -3632,6 +3661,7 @@ function buildMatchHTMLFast(m,pred,s,res){
     html+='<div class="mkt-section"><div class="mkt-section-title">Totaux</div><div class="mkt-grid g4r">'+mktBox(pred.plus,'+'+s)+mktBox(pred.under,'-'+s)+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+'</div></div>';
     html+='<div class="mkt-section"><div class="mkt-section-title">1X2 \u00b7 DC</div><div class="mkt-grid g6">'+mktBox(pred.v1,'Dom')+mktBox(pred.x,'Nul')+mktBox(pred.v2,'Ext')+mktBox(pred.dc1x,'DC1X')+mktBox(pred.dcx2,'DCX2')+mktBox(pred.dc12,'DC12')+'</div></div>';
     html+='<div class="mkt-section"><div class="mkt-section-title">CS</div><div class="mkt-grid g4r">'+mktBox(pred.csH,'CS Dom')+mktBox(pred.csA,'CS Ext')+mktBox(pred.hmsc,'Dom Mq')+mktBox(pred.amsc,'Ext Mq')+'</div></div>';
+    if(mlP){html+='<div class="mkt-section" style="border-top:1px dashed rgba(176,107,255,.3);padding-top:6px;margin-top:4px"><div class="mkt-section-title" style="color:var(--p)">?? ML</div><div class="mkt-grid g4r">'+mlBox(mlP.over,'Over')+mlBox(mlP.btts,'BTTS')+mlBox(mlP.v1,'V1')+mlBox(mlP.x,'X')+'</div></div>';}
   } else if(tdMkt==='totaux'){
     html+='<div class="mkt-section"><div class="mkt-section-title">Over/Under +'+s+'</div><div class="mkt-grid g4r">'+mktBox(pred.plus,'+'+s)+mktBox(pred.under,'-'+s)+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+'</div>';
     if(ligS)html+='<div style="font-size:.58rem;color:var(--dm);margin-top:4px;font-family:var(--mono)">Ligue: Over '+ligS.over+'% \u00b7 Under '+ligS.under+'% \u00b7 Moy '+pred.moyButs+' buts</div>';
@@ -7836,6 +7866,228 @@ function getActiveMktSig(pred, mktId){
   };
   var key=mktMap[mktId]||'over';
   return pred.mktSignals[key]||{sigL:pred.sigL,sigH:pred.sigH,sigD:pred.sigD,conv:pred.convergence,nbSig:pred.nbSig};
+}
+
+
+function toggleAnTeamList(){
+  var panel=document.getElementById('anTeamListPanel');
+  var btn=document.getElementById('anTeamListBtn');
+  var open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  btn.textContent=open?'\u25b2 Masquer':'\u25bc Afficher';
+  if(open)renderAnTeamList();
+}
+
+function renderAnTeamList(){
+  var search=(document.getElementById('anTeamSearch').value||'').toLowerCase();
+  var minN=parseInt(document.getElementById('anTeamMinMatch').value)||5;
+  var cache=buildTeamCache();
+  var out=document.getElementById('anTeamListOut');
+  var teams=Object.entries(cache).map(function(e){
+    var name=e[0],tc=e[1];
+    var hP=tc.home?tc.home.played:0;
+    var aP=tc.away?tc.away.played:0;
+    return{name:name,hP:hP,aP:aP,total:hP+aP};
+  }).filter(function(t){
+    if(t.hP<minN&&t.aP<minN)return false;
+    if(search&&t.name.toLowerCase().indexOf(search)<0)return false;
+    return true;
+  }).sort(function(a,b){return b.total-a.total;});
+  if(!teams.length){out.innerHTML='<div style="text-align:center;color:var(--dm);font-size:.7rem;font-family:var(--mono);padding:12px">Aucune \xe9quipe avec suffisamment de matchs</div>';return;}
+  var html='<div style="font-size:.58rem;color:var(--dm);font-family:var(--mono);margin-bottom:6px">'+teams.length+' \xe9quipes</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:.63rem">';
+  html+='<tr><th style="text-align:left;color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem;padding:2px 0">\xc9QUIPE</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">DOM</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">EXT</th><th style="color:var(--dm);font-weight:500;font-family:var(--mono);font-size:.55rem">CHARGER</th></tr>';
+  teams.forEach(function(t){
+    var hOk=t.hP>=minN,aOk=t.aP>=minN;
+    var n=t.name.replace(/'/g,"\\'");
+    html+='<tr style="border-bottom:1px solid rgba(255,255,255,.03)">';
+    html+='<td style="padding:3px 0;font-weight:600">'+t.name+'</td>';
+    html+='<td style="text-align:center;color:'+(hOk?'var(--g)':'var(--r)')+'">'+t.hP+'</td>';
+    html+='<td style="text-align:center;color:'+(aOk?'var(--g)':'var(--r)')+'">'+t.aP+'</td>';
+    html+='<td style="text-align:center">';
+    if(hOk)html+='<button onclick="loadTeamIntoAnalysis(\''+n+'\',\'home\')" style="font-size:.55rem;padding:2px 5px;background:rgba(61,155,255,.1);border:1px solid var(--b);border-radius:4px;color:var(--b);cursor:pointer;margin-right:2px">DOM</button>';
+    if(aOk)html+='<button onclick="loadTeamIntoAnalysis(\''+n+'\',\'away\')" style="font-size:.55rem;padding:2px 5px;background:rgba(255,199,44,.1);border:1px solid var(--y);border-radius:4px;color:var(--y);cursor:pointer">EXT</button>';
+    html+='</td></tr>';
+  });
+  html+='</table>';
+  out.innerHTML=html;
+}
+
+function loadTeamIntoAnalysis(name,side){
+  var inp=document.getElementById(side==='home'?'anHome':'anAway');
+  if(!inp)return;
+  inp.value=name;
+  onAnTeamInput();
+  document.getElementById('anTeamListPanel').style.display='none';
+  document.getElementById('anTeamListBtn').textContent='\u25bc Afficher';
+  var c=document.getElementById('anTeamCards');
+  if(c)c.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+
+// ══════════════════════════════════════════════
+// ML ENGINE — Régression logistique par marché
+// Entraîné depuis le tracking IDB (30k matchs)
+// ══════════════════════════════════════════════
+
+var _mlModels = null; // {over:{w,b}, btts:{w,b}, v1:{w,b}, ...}
+var _mlTrained = false;
+var _mlTrainedOn = 0; // nb entrées utilisées
+
+// Sigmoid
+function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+
+// Features extraites d'une entrée de tracking
+// [sigL/100, sigH/100, sigD/100, conv/3, nbSig/3, conf/100, ligTotal/500]
+function mlFeatures(t){
+  var sL=t.pConf!==null?t.pConf/100:0.5;
+  var cv=(t.pConv||0)/3;
+  var ns=(t.pNbSig||0)/3;
+  var cf=(t.pConf||50)/100;
+  var lt=Math.min((t.ligTotal||0)/500,1);
+  // Signaux par marché si v2
+  var sigL=t.sigL!==null&&t.sigL!==undefined?t.sigL:sL;
+  var sigH=t.sigH!==null&&t.sigH!==undefined?t.sigH:sL;
+  var sigD=t.sigD!==null&&t.sigD!==undefined?t.sigD:sL;
+  return[
+    sigL,sigH,sigD,
+    cv,ns,cf,lt,
+    1.0 // biais
+  ];
+}
+
+// Entraîner une régression logistique pour un marché
+// entries: [{features:[...], label:0/1}, ...]
+function trainLogisticRegression(samples, lr, epochs){
+  var nF=samples[0].features.length;
+  var w=new Array(nF).fill(0);
+  var n=samples.length;
+  for(var ep=0;ep<epochs;ep++){
+    var grad=new Array(nF).fill(0);
+    for(var i=0;i<n;i++){
+      var f=samples[i].features;
+      var y=samples[i].label;
+      var dot=0;for(var j=0;j<nF;j++)dot+=w[j]*f[j];
+      var pred=sigmoid(dot);
+      var err=pred-y;
+      for(var j=0;j<nF;j++)grad[j]+=err*f[j];
+    }
+    for(var j=0;j<nF;j++)w[j]-=(lr/n)*grad[j];
+  }
+  return w;
+}
+
+// Prédire avec le modèle
+function mlPredict(w, features){
+  var dot=0;
+  for(var i=0;i<w.length;i++)dot+=w[i]*features[i];
+  return sigmoid(dot);
+}
+
+// Clés tracking → label pour chaque marché ML
+var ML_MARKETS=[
+  {id:'over', rKey:'rPlus', label:'Over'},
+  {id:'btts', rKey:'rBtts', label:'BTTS'},
+  {id:'v1',   rKey:null, rVal:'V1', label:'V1'},
+  {id:'x',    rKey:null, rVal:'X',  label:'X'},
+  {id:'v2',   rKey:null, rVal:'V2', label:'V2'},
+  {id:'dc1x', rKey:'rDc1x', label:'DC1X'},
+  {id:'hmsc', rKey:'rHmsc', label:'DomMq'},
+];
+
+// Entraîner tous les modèles depuis le tracking
+async function trainMLModels(forceRetrain){
+  if(_mlTrained&&!forceRetrain)return _mlModels;
+  var entries=getTrackCompat();
+  if(entries.length<50){
+    console.log('[ML] Pas assez de donnees:',entries.length);
+    return null;
+  }
+  var models={};
+  ML_MARKETS.forEach(function(mkt){
+    var samples=entries.filter(function(t){
+      return t.rH!==null&&t.rH!==undefined&&t.rA!==null;
+    }).map(function(t){
+      var label;
+      if(mkt.rVal){
+        label=t.rV1x2===mkt.rVal?1:0;
+      } else {
+        label=t[mkt.rKey]?1:0;
+      }
+      return{features:mlFeatures(t),label:label};
+    });
+    if(samples.length<50){models[mkt.id]=null;return;}
+    // LR=0.1, 200 epochs — léger pour mobile
+    var w=trainLogisticRegression(samples,0.1,200);
+    models[mkt.id]={w:w,n:samples.length,
+      acc:Math.round(samples.filter(function(s){return(mlPredict(w,s.features)>0.5?1:0)===s.label;}).length/samples.length*100)};
+  });
+  _mlModels=models;
+  _mlTrained=true;
+  _mlTrainedOn=entries.length;
+  console.log('[ML] Entrainement termine:',entries.length,'entrees',Object.keys(models).filter(function(k){return models[k];}).length,'marches');
+  return models;
+}
+
+// Calculer les prédictions ML pour un match
+function mlPredictMatch(pred, m){
+  if(!_mlModels||!pred)return null;
+  // Construire un faux "tracking entry" avec les features disponibles
+  var fakeT={
+    pConv:pred.convergence||0,
+    pNbSig:pred.nbSig||0,
+    pConf:pred.conf||50,
+    ligTotal:pred.ligTotal||0,
+    sigL:pred.sigL,sigH:pred.sigH,sigD:pred.sigD
+  };
+  var f=mlFeatures(fakeT);
+  var result={};
+  ML_MARKETS.forEach(function(mkt){
+    var model=_mlModels[mkt.id];
+    if(!model)return;
+    result[mkt.id]=mlPredict(model.w,f);
+  });
+  // Under = 1 - over, bttsN = 1 - btts
+  if(result.over!==undefined)result.under=1-result.over;
+  if(result.btts!==undefined)result.bttsN=1-result.btts;
+  if(result.v1!==undefined&&result.x!==undefined&&result.v2!==undefined){
+    // Normaliser 1X2 pour sommer à 1
+    var s12=result.v1+result.x+result.v2;
+    if(s12>0){result.v1=result.v1/s12;result.x=result.x/s12;result.v2=result.v2/s12;}
+  }
+  return result;
+}
+
+// Statut d'entrainement
+function mlStatus(){
+  if(!_mlTrained)return null;
+  var ok=Object.keys(_mlModels).filter(function(k){return _mlModels[k];});
+  return{trained:true,entries:_mlTrainedOn,markets:ok.length,models:_mlModels};
+}
+
+
+async function trainAndShowML(){
+  var btn=document.getElementById('mlTrainBtn');
+  var bar=document.getElementById('mlStatusBar');
+  btn.textContent='?? Entraînement en cours...';btn.disabled=true;
+  bar.style.display='block';bar.textContent='Chargement du tracking...';
+  // Give UI time to update
+  await new Promise(function(r){setTimeout(r,50);});
+  try{
+    var models=await trainMLModels(true);
+    if(!models){bar.textContent='Pas assez de données (min 50 entrées de tracking)';btn.disabled=false;btn.textContent='?? Entraîner le modèle ML';return;}
+    var st=mlStatus();
+    var lines=st.markets+' marchés entraînés sur '+st.entries+' matchs';
+    var acc=Object.entries(st.models).filter(function(e){return e[1];}).map(function(e){return e[0]+': '+e[1].acc+'%';}).join(' · ');
+    bar.textContent=lines+' — Précision: '+acc;
+    bar.style.color='var(--g)';
+    btn.textContent='?? Ré-entraîner';
+    // Refresh match list to show ML predictions
+    if(allMatchsCache.length)renderMatchsList();
+  }catch(e){
+    bar.textContent='Erreur: '+e.message;bar.style.color='var(--r)';
+  }
+  btn.disabled=false;
 }
 
 </script>
