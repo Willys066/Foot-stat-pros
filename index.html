@@ -1800,7 +1800,14 @@ function buildTrackEntry(m,pred,s,h,a){
     cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0,
     ms:(function(){if(!pred.mktSignals)return null;var ms={};['over','under','btts','bttsN','v1','x','v2','dc1x','dcx2','dc12','csH','csA','hmsc','amsc'].forEach(function(k){if(pred.mktSignals[k])ms[k]={c:pred.mktSignals[k].conv,n:pred.mktSignals[k].nbSig};});return ms;})(),
     ms:ms,_v2:true,
-    pML:(window._mlModels&&m._predML)?{over:m._predML.over!==undefined?Math.round(m._predML.over*100):null,btts:m._predML.btts!==undefined?Math.round(m._predML.btts*100):null,v1:m._predML.v1!==undefined?Math.round(m._predML.v1*100):null,x:m._predML.x!==undefined?Math.round(m._predML.x*100):null,v2:m._predML.v2!==undefined?Math.round(m._predML.v2*100):null}:null};
+    pML:(function(){
+      try{
+        if(!window._mlModels||!window._mlTrained)return null;
+        var mlr=mlPredictMatch(pred,m);
+        if(!mlr)return null;
+        return{over:mlr.over!==undefined?Math.round(mlr.over*100):null,btts:mlr.btts!==undefined?Math.round(mlr.btts*100):null,v1:mlr.v1!==undefined?Math.round(mlr.v1*100):null,x:mlr.x!==undefined?Math.round(mlr.x*100):null,v2:mlr.v2!==undefined?Math.round(mlr.v2*100):null};
+      }catch(e){return null;}
+    })()};
 }
 // Accesseurs de compatibilité pour le code existant qui lit les anciens noms de champs
 function tkCompat(t){
@@ -3304,6 +3311,8 @@ function buildMatchHTML(m,pred,s){
     return'<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+cl+'" style="font-size:.7rem">'+v+'%</div><div class="mkt-lbl" style="color:var(--p)">'+lbl+'</div></div>';
   }
 
+  var mlP=m._predML;
+  function mlBox(val,lbl){if(val===null||val===undefined)return'';var v=Math.round(val*100);var cl=v>=60?'mv-g':v>=45?'mv-y':'mv-r';return'<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+cl+'" style="font-size:.7rem">'+v+'%</div><div class="mkt-lbl" style="color:var(--p)">'+lbl+'</div></div>';}
   var ligS=pred.ligStats;
   if(tdMkt==='auto'){
     if(pred.bestMarket)html+='<div class="dominant-badge">⭐ '+pred.bestMarket.label+' — '+Math.round(pred.bestMarket.prob*100)+'%</div>';
