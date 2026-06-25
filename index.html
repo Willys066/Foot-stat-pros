@@ -1797,17 +1797,10 @@ function buildTrackEntry(m,pred,s,h,a){
     p1x:pred.dc1x!==null?Math.round(pred.dc1x*100):null,
     px2:pred.dcx2!==null?Math.round(pred.dcx2*100):null,
     p12:pred.dc12!==null?Math.round(pred.dc12*100):null,
-    cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0,
-    ms:(function(){if(!pred.mktSignals)return null;var ms={};['over','under','btts','bttsN','v1','x','v2','dc1x','dcx2','dc12','csH','csA','hmsc','amsc'].forEach(function(k){if(pred.mktSignals[k])ms[k]={c:pred.mktSignals[k].conv,n:pred.mktSignals[k].nbSig};});return ms;})(),
-    ms:ms,_v2:true,
-    pML:(function(){
-      try{
-        if(!window._mlModels||!window._mlTrained)return null;
-        var mlr=mlPredictMatch(pred,m);
-        if(!mlr)return null;
-        return{over:mlr.over!==undefined?Math.round(mlr.over*100):null,btts:mlr.btts!==undefined?Math.round(mlr.btts*100):null,v1:mlr.v1!==undefined?Math.round(mlr.v1*100):null,x:mlr.x!==undefined?Math.round(mlr.x*100):null,v2:mlr.v2!==undefined?Math.round(mlr.v2*100):null};
-      }catch(e){return null;}
-    })()};
+    cf:pred.conf||0,cv:pred.convergence||0,ns:pred.nbSig||0,co:m.country||'?',
+    ms:(function(){if(!pred||!pred.mktSignals)return null;var ms={};['over','under','btts','bttsN','v1','x','v2','dc1x','dcx2','dc12','csH','csA','hmsc','amsc'].forEach(function(k){if(pred.mktSignals[k])ms[k]={c:pred.mktSignals[k].conv,n:pred.mktSignals[k].nbSig};});return ms;})(),
+    _v2:true,
+    pML:(function(){try{if(!window._mlModels||!window._mlTrained)return null;var mlr=mlPredictMatch(pred,m);if(!mlr)return null;return{over:mlr.over!==undefined?Math.round(mlr.over*100):null,btts:mlr.btts!==undefined?Math.round(mlr.btts*100):null,v1:mlr.v1!==undefined?Math.round(mlr.v1*100):null,x:mlr.x!==undefined?Math.round(mlr.x*100):null,v2:mlr.v2!==undefined?Math.round(mlr.v2*100):null};}catch(e){return null;}})()};
 }
 // Accesseurs de compatibilité pour le code existant qui lit les anciens noms de champs
 function tkCompat(t){
