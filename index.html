@@ -3295,16 +3295,6 @@ function buildMatchHTML(m,pred,s){
   var sa=pred.seuilAdapte;
   if(sa!==null&&sa!==s)html+='<div style="font-size:.6rem;background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.18);border-radius:5px;padding:3px 7px;margin-bottom:6px;color:var(--y)">Seuil adapté: +'+sa+' (moy '+pred.moyButs+' buts/match)</div>';
   var mlP=m._predML;
-
-  // Helper ML box
-  function mlBox(val,lbl){
-    if(val===null||val===undefined)return'';
-    var v=Math.round(val*100);
-    var cl=v>=60?'mv-g':v>=45?'mv-y':'mv-r';
-    return'<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+cl+'" style="font-size:.7rem">'+v+'%</div><div class="mkt-lbl" style="color:var(--p)">'+lbl+'</div></div>';
-  }
-
-  var mlP=m._predML;
   function mlBox(val,lbl){if(val===null||val===undefined)return'';var v=Math.round(val*100);var cl=v>=60?'mv-g':v>=45?'mv-y':'mv-r';return'<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+cl+'" style="font-size:.7rem">'+v+'%</div><div class="mkt-lbl" style="color:var(--p)">'+lbl+'</div></div>';}
   var ligS=pred.ligStats;
   if(tdMkt==='auto'){
@@ -3481,6 +3471,7 @@ function renderMatchsList(){
   else modeFiltered=allMatchsCache.slice();
 
   var fx=modeFiltered.filter(function(m){
+    if(mode==='done')return true; // matchs terminés : pas de filtre convergence
     if(convFilterVal===0)return true;
     return(m._pred?m._pred.convergence:0)>=convFilterVal;
   });
@@ -3663,7 +3654,17 @@ function buildMatchHTMLFast(m,pred,s,res){
     html+='<div class="mkt-section"><div class="mkt-section-title">Totaux</div><div class="mkt-grid g4r">'+mktBox(pred.plus,'+'+s)+mktBox(pred.under,'-'+s)+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+'</div></div>';
     html+='<div class="mkt-section"><div class="mkt-section-title">1X2 \u00b7 DC</div><div class="mkt-grid g6">'+mktBox(pred.v1,'Dom')+mktBox(pred.x,'Nul')+mktBox(pred.v2,'Ext')+mktBox(pred.dc1x,'DC1X')+mktBox(pred.dcx2,'DCX2')+mktBox(pred.dc12,'DC12')+'</div></div>';
     html+='<div class="mkt-section"><div class="mkt-section-title">CS</div><div class="mkt-grid g4r">'+mktBox(pred.csH,'CS Dom')+mktBox(pred.csA,'CS Ext')+mktBox(pred.hmsc,'Dom Mq')+mktBox(pred.amsc,'Ext Mq')+'</div></div>';
-    if(mlP){html+='<div class="mkt-section" style="border-top:1px dashed rgba(176,107,255,.3);padding-top:6px;margin-top:4px"><div class="mkt-section-title" style="color:var(--p)">?? ML</div><div class="mkt-grid g4r">'+mlBox(mlP.over,'Over')+mlBox(mlP.btts,'BTTS')+mlBox(mlP.v1,'V1')+mlBox(mlP.x,'X')+'</div></div>';}
+    if(mlP){
+      var mlDiff=function(mval,pval){if(mval===null||mval===undefined||pval===null||pval===undefined)return'';var d=Math.round(mval*100)-Math.round(pval*100);return d===0?'':' <span style="font-size:.5rem;color:'+(d>0?'var(--g)':'var(--r)')+';">'+(d>0?'+':'')+d+'</span>';};
+      html+='<div class="mkt-section" style="border-top:1px dashed rgba(176,107,255,.3);padding-top:6px;margin-top:4px">';
+      html+='<div class="mkt-section-title" style="color:var(--p)">?? ML <span style="font-size:.52rem;color:var(--dm);font-weight:400">(diff vs classique)</span></div>';
+      html+='<div class="mkt-grid g4r">';
+      if(mlP.over!==undefined)html+='<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+(mlP.over>=0.6?'mv-g':mlP.over>=0.45?'mv-y':'mv-r')+'" style="font-size:.7rem">'+Math.round(mlP.over*100)+'%'+mlDiff(mlP.over,pred.plus)+'</div><div class="mkt-lbl" style="color:var(--p)">Over</div></div>';
+      if(mlP.btts!==undefined)html+='<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+(mlP.btts>=0.6?'mv-g':mlP.btts>=0.45?'mv-y':'mv-r')+'" style="font-size:.7rem">'+Math.round(mlP.btts*100)+'%'+mlDiff(mlP.btts,pred.btts)+'</div><div class="mkt-lbl" style="color:var(--p)">BTTS</div></div>';
+      if(mlP.v1!==undefined)html+='<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+(mlP.v1>=0.6?'mv-g':mlP.v1>=0.45?'mv-y':'mv-r')+'" style="font-size:.7rem">'+Math.round(mlP.v1*100)+'%'+mlDiff(mlP.v1,pred.v1)+'</div><div class="mkt-lbl" style="color:var(--p)">V1</div></div>';
+      if(mlP.x!==undefined)html+='<div class="mkt-box" style="border:1px solid rgba(176,107,255,.3)"><div class="mkt-val '+(mlP.x>=0.6?'mv-g':mlP.x>=0.45?'mv-y':'mv-r')+'" style="font-size:.7rem">'+Math.round(mlP.x*100)+'%'+mlDiff(mlP.x,pred.x)+'</div><div class="mkt-lbl" style="color:var(--p)">X</div></div>';
+      html+='</div></div>';
+    }
   } else if(tdMkt==='totaux'){
     html+='<div class="mkt-section"><div class="mkt-section-title">Over/Under +'+s+'</div><div class="mkt-grid g4r">'+mktBox(pred.plus,'+'+s)+mktBox(pred.under,'-'+s)+mktBox(pred.btts,'BTTS Oui')+mktBox(pred.bttsNon,'BTTS Non')+'</div>';
     if(ligS)html+='<div style="font-size:.58rem;color:var(--dm);margin-top:4px;font-family:var(--mono)">Ligue: Over '+ligS.over+'% \u00b7 Under '+ligS.under+'% \u00b7 Moy '+pred.moyButs+' buts</div>';
