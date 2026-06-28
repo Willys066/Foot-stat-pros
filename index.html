@@ -951,6 +951,7 @@ tr:hover td{background:var(--s2)}
         <button class="stats-mkt-tab" onclick="setStatsMkt('cs',this)">CS</button>
         <button class="stats-mkt-tab" onclick="setStatsMkt('buts',this)">Dom/Ext</button>
         <button class="stats-mkt-tab" onclick="setStatsMkt('global',this)">Global</button>
+        <button class="stats-mkt-tab" onclick="setStatsMkt('mt',this)">⏱ Mi-Temps</button>
       </div>
     </div>
     <button class="btn bb" onclick="calcStats()">Calculer les stats</button>
@@ -1230,6 +1231,13 @@ tr:hover td{background:var(--s2)}
     <button class="btn bb" onclick="calcFiabilite()" style="margin-bottom:7px">📊 Analyser la fiabilité</button>
     <button class="bsm" onclick="resetCalib()" style="width:100%;padding:9px;text-align:center;color:var(--y)">Réinitialiser la calibration</button>
     <button class="bsm" onclick="resetDumpCountries()" style="width:100%;padding:9px;text-align:center;color:var(--r);margin-top:5px">↩ Réinitialiser les pays dump mal assignés</button>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">
+      <div class="lsm">Données Mi-Temps</div>
+      <div style="font-size:.6rem;color:var(--dm);font-family:var(--mono);margin-bottom:6px;line-height:1.5">Re-télécharge les matchs sans données MT depuis l'API.<br>⚠ Consomme 1 req/6s — peut prendre du temps selon la taille de ta base.</div>
+      <button id="htRefreshBtn" class="bsm" onclick="refreshHT()" style="width:100%;padding:9px;text-align:center;color:var(--b);border-color:var(--b)">⏱ Rafraîchir données MT (anciens matchs)</button>
+      <button id="htStopBtn" class="bsm" onclick="stopHTRefresh()" style="display:none;width:100%;padding:9px;text-align:center;color:var(--r);border-color:var(--r);margin-top:4px">⏹ Arrêter</button>
+      <div id="htRefreshBar" style="display:none;font-size:.6rem;font-family:var(--mono);color:var(--dm);margin-top:6px;padding:8px;background:var(--s2);border-radius:6px"></div>
+    </div>
     <button class="btn bb" onclick="openLeagueEditor()" style="margin-top:10px;font-size:.78rem">🏆 Éditeur de ligues (pays manquants)</button>
   </div>
   <div class="al" id="fiabAl"></div>
@@ -1539,12 +1547,18 @@ function parseFix(f,tz){
   var g=f.goals||{},h=g.home!=null?g.home:null,a=g.away!=null?g.away:null;
   var ts=f.fixture&&f.fixture.timestamp?f.fixture.timestamp:0;
   var v=null;if(h!==null&&a!==null){v=h>a?'V1':h<a?'V2':'X'}
+  var sc=f.score||{};
+  var htH=sc.halftime&&sc.halftime.home!=null?sc.halftime.home:null;
+  var htA=sc.halftime&&sc.halftime.away!=null?sc.halftime.away:null;
+  var htV=null;if(htH!==null&&htA!==null){htV=htH>htA?'V1':htH<htA?'V2':'X';}
   return{id:f.fixture?f.fixture.id:0,ts:ts,heure:tsH(ts,tz),
     status:f.fixture&&f.fixture.status?f.fixture.status.short:'',
     elapsed:f.fixture&&f.fixture.status?f.fixture.status.elapsed||0:0,
     league:f.league?f.league.name:'?',country:f.league?f.league.country:'?',
     home:f.teams&&f.teams.home?f.teams.home.name:'?',away:f.teams&&f.teams.away?f.teams.away.name:'?',
-    h:h,a:a,total:(h!==null&&a!==null)?h+a:null,v1x2:v,btts:(h!==null&&a!==null)?(h>0&&a>0):null}
+    h:h,a:a,total:(h!==null&&a!==null)?h+a:null,v1x2:v,btts:(h!==null&&a!==null)?(h>0&&a>0):null,
+    htH:htH,htA:htA,htTotal:(htH!==null&&htA!==null)?htH+htA:null,
+    htV1x2:htV,htBtts:(htH!==null&&htA!==null)?(htH>0&&htA>0):null}
 }
 
 // ═══════════════════════════════════ INDEXEDDB ═══
@@ -1781,7 +1795,7 @@ function computeAndSaveCalib(entries,s){
 function buildTrackEntry(m,pred,s,h,a){
   // Champs minimaux pour économiser localStorage (limite ~5MB mobile)
   // Les booléens résultat sont calculés à la volée depuis rH/rA/seuil
-  return{id:m.id,dt:m.date||today(),ho:m.home,aw:m.away,lg:m.league||'?',s:s,
+  return{id:m.id,dt:m.date||today(),ho:m.home,aw:m.away,lg:m.league||'?',co:m.country||'?',s:s,htH:(m.htH!==undefined?m.htH:null),htA:(m.htA!==undefined?m.htA:null),
     rH:h,rA:a,
     pP:pred.plus!==null?Math.round(pred.plus*100):null,
     pU:pred.under!==null?Math.round(pred.under*100):null,
@@ -1814,7 +1828,15 @@ function tkCompat(t){
     pBtts:t.pB,pBttsNon:t.pBN,pCsH:t.pCH,pCsA:t.pCA,
     pHmsc:t.pH,pAmsc:t.pA,pDc1x:t.p1x,pDcx2:t.px2,pDc12:t.p12,
     pConf:t.cf,pConv:t.cv,pNbSig:t.ns,auto:true,
-    moyBH:null,moyBA:null,scenarioScores:null,scenarioType:null};
+    moyBH:null,moyBA:null,scenarioScores:null,scenarioType:null,
+    htH:t.htH!==undefined?t.htH:null,htA:t.htA!==undefined?t.htA:null,
+    htTotal:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?t.htH+t.htA:null,
+    htV1x2:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?(t.htH>t.htA?'V1':t.htH<t.htA?'V2':'X'):null,
+    htBtts:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?(t.htH>0&&t.htA>0):null,
+    rHtPlus:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?(t.htH+t.htA)>0.5:null,
+    rHtV1:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?t.htH>t.htA:null,
+    rHtX:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?t.htH===t.htA:null,
+    rHtV2:(t.htH!==null&&t.htH!==undefined&&t.htA!==null&&t.htA!==undefined)?t.htA>t.htH:null};
 }
 function getTrackCompat(){return getTrack().map(tkCompat);}
 
@@ -1977,6 +1999,26 @@ function buildStatsHTML(av,n,s,tz,nbDates,matchs){
     html+='<div class="st">Ext Marque par heure</div>'+buildStatsByHour(av,s,tz,'amsc','Ext Mq');
     html+='<div class="st">Ext Marque par jour</div>'+buildStatsByDay(av,s,tz,'amsc','Ext Mq');
   }
+  if(statsMkt==='mt'||statsMkt==='global'){
+    var avHt=av.filter(function(m){return m.htH!==null&&m.htH!==undefined;});
+    var nHt=avHt.length;
+    if(nHt>0){
+      var nHtP=avHt.filter(function(m){return(m.htH+m.htA)>0}).length;
+      var nHtV1=avHt.filter(function(m){return m.htH>m.htA}).length;
+      var nHtX=avHt.filter(function(m){return m.htH===m.htA}).length;
+      var nHtV2=avHt.filter(function(m){return m.htA>m.htH}).length;
+      var nHtBtts=avHt.filter(function(m){return m.htH>0&&m.htA>0}).length;
+      var moyHt=(avHt.reduce(function(s,m){return s+m.htH+m.htA;},0)/nHt).toFixed(2);
+      html+='<div class="st">MI-TEMPS ('+nHt+' matchs avec données)</div>';
+      html+='<div class="sg g4"><div class="sb"><div class="sv" style="color:var(--b)">'+Math.round(nHtP/nHt*100)+'%</div><div class="sl">Over MT</div></div><div class="sb"><div class="sv" style="color:var(--g)">'+Math.round(nHtV1/nHt*100)+'%</div><div class="sl">Dom MT</div></div><div class="sb"><div class="sv" style="color:var(--dm)">'+Math.round(nHtX/nHt*100)+'%</div><div class="sl">Nul MT</div></div><div class="sb"><div class="sv" style="color:var(--r)">'+Math.round(nHtV2/nHt*100)+'%</div><div class="sl">Ext MT</div></div></div>';
+      html+='<div class="sg g2"><div class="sb"><div class="sv" style="color:var(--y)">'+Math.round(nHtBtts/nHt*100)+'%</div><div class="sl">BTTS MT</div></div><div class="sb"><div class="sv" style="color:var(--p)">'+moyHt+'</div><div class="sl">Buts moy. MT</div></div></div>';
+      html+='<div class="st">Dom MT par heure</div>'+buildStatsByHour(avHt,s,tz,'v1','Dom MT');
+      html+='<div class="st">Dom MT par jour</div>'+buildStatsByDay(avHt,s,tz,'v1','Dom MT');
+      html+='<div class="st">Nul MT par heure</div>'+buildStatsByHour(avHt,s,tz,'x','Nul MT');
+    } else {
+      html+='<div style="text-align:center;color:var(--dm);font-size:.72rem;font-family:var(--mono);padding:16px">Aucune donnée mi-temps — les données MT sont disponibles uniquement pour les matchs collectés via api-football (pas le dump).</div>';
+    }
+  }
   return html;
 }
 
@@ -2013,6 +2055,11 @@ function getAllMarkets(s){
     {id:'csA',label:'CS Ext',pKey:'pCsA',rKey:'rCsA',rVal:null,positive:true},
     {id:'hmsc',label:'Dom Marque',pKey:'pHmsc',rKey:'rHmsc',rVal:null,positive:true},
     {id:'amsc',label:'Ext Marque',pKey:'pAmsc',rKey:'rAmsc',rVal:null,positive:true}
+    ,{id:'htPlus',label:'MT Over 0.5',pKey:null,rKey:'rHtPlus',rVal:null,positive:true}
+    ,{id:'htV1',label:'MT Dom',pKey:null,rKey:'rHtV1',rVal:null,positive:true}
+    ,{id:'htX',label:'MT Nul',pKey:null,rKey:'rHtX',rVal:null,positive:true}
+    ,{id:'htV2',label:'MT Ext',pKey:null,rKey:'rHtV2',rVal:null,positive:true}
+    ,{id:'htBtts',label:'MT BTTS',pKey:null,rKey:'htBtts',rVal:null,positive:true}
   ];
 }
 
@@ -3641,6 +3688,7 @@ function buildMatchHTMLFast(m,pred,s,res){
   var sa=pred.seuilAdapte;
   if(sa!==null&&sa!==s)html+='<div style="font-size:.6rem;background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.18);border-radius:5px;padding:3px 7px;margin-bottom:6px;color:var(--y)">Seuil adapt\u00e9: +'+sa+' (moy '+pred.moyButs+' buts/match)</div>';
 
+  var mlP=m._predML;
   function mktBox(val,lbl){
     if(val===null||val===undefined)return'<div class="mkt-box"><div class="mkt-val mv-d">?</div><div class="mkt-lbl">'+lbl+'</div></div>';
     var v=Math.round(val*100);
@@ -8092,6 +8140,87 @@ async function trainAndShowML(){
   }
   btn.disabled=false;
 }
+
+
+// ══════════════════════════════════════════════
+// REFRESH DONNÉES MI-TEMPS
+// Re-télécharge les dates sans données MT depuis l'API
+// ══════════════════════════════════════════════
+var _htRefreshStop = false;
+
+async function refreshHT(){
+  if(!cfg.apiKey){showAl('cfgAl','er','Clé API requise');return;}
+  var db=getDB();
+  var tz=getTz();
+
+  // Trouver toutes les dates avec des matchs terminés mais sans htH
+  var datesNeedHT=[];
+  Object.keys(db).sort().forEach(function(date){
+    var matchs=db[date]||[];
+    var hasTerm=matchs.some(function(m){return TERM.indexOf(m.status)>=0;});
+    var hasMT=matchs.some(function(m){return m.htH!==null&&m.htH!==undefined;});
+    if(hasTerm&&!hasMT)datesNeedHT.push(date);
+  });
+
+  if(!datesNeedHT.length){
+    showAl('cfgAl','ok','✅ Toutes les dates ont déjà des données MT !');
+    setTimeout(function(){hideAl('cfgAl');},4000);
+    return;
+  }
+
+  var bar=document.getElementById('htRefreshBar');
+  var btn=document.getElementById('htRefreshBtn');
+  bar.style.display='block';
+  btn.disabled=true;
+  _htRefreshStop=false;
+  document.getElementById('htStopBtn').style.display='inline-block';
+
+  var done=0,errors=0,total=datesNeedHT.length;
+
+  function upd(){
+    bar.innerHTML='Refresh MT: '+done+'/'+total+' dates'+(errors?' (❌ '+errors+' err)':'')+
+      ' <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:4px">'+
+      '<div style="height:4px;background:var(--b);border-radius:2px;width:'+Math.round(done/total*100)+'%"></div></div>';
+  }
+
+  for(var i=0;i<datesNeedHT.length;i++){
+    if(_htRefreshStop)break;
+    var date=datesNeedHT[i];
+    upd();
+    try{
+      var data=await apiCall('/fixtures',{date:date});
+      if(!data||!data.response){errors++;continue;}
+      var existing=db[date]||[];
+      var fresh=data.response.map(function(f){return parseFix(f,tz);});
+      // Merge : garder les données existantes, ajouter juste htH/htA depuis le refresh
+      var merged=existing.map(function(m){
+        var f=fresh.find(function(x){return x.id===m.id;});
+        if(f&&f.htH!==null&&f.htH!==undefined){
+          m.htH=f.htH;m.htA=f.htA;
+          m.htTotal=f.htTotal;m.htV1x2=f.htV1x2;m.htBtts=f.htBtts;
+        }
+        return m;
+      });
+      if(_dbCache)_dbCache[date]=merged;
+      await saveDateToIDB(date,merged);
+      done++;
+    }catch(e){errors++;}
+    // Respecter le rate limit : 1 req toutes les 6s (10/min)
+    if(i<datesNeedHT.length-1&&!_htRefreshStop)await sleep(6200);
+  }
+
+  btn.disabled=false;
+  document.getElementById('htStopBtn').style.display='none';
+  var msg=_htRefreshStop?
+    '⏹ Arrêté — '+done+'/'+total+' dates rafraîchies':
+    '✅ '+done+' dates rafraîchies'+(errors?' (❌ '+errors+' erreurs)':'');
+  bar.innerHTML=msg;
+  showAl('cfgAl',errors?'in':'ok',msg);
+  setTimeout(function(){hideAl('cfgAl');},5000);
+  majDB();
+}
+
+function stopHTRefresh(){_htRefreshStop=true;}
 
 </script>
 </body>
